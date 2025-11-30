@@ -14,6 +14,33 @@ app.use(express.json());
 
 // --- Public Routes ---
 
+// Helper Route to create a test user for debugging
+app.get('/api/create-test-user', async (req, res) => {
+  try {
+    const [user, created] = await User.findOrCreate({
+      where: { username: 'testuser' },
+      defaults: {
+        password: 'password123', // bcrypt will hash this automatically
+        role: 'driver',
+        companyId: 1 // Assuming a company with ID 1 exists, or adjust as needed
+      }
+    });
+
+    if (created) {
+      // Also ensure a default company exists for the user
+      await Company.findOrCreate({
+          where: { id: 1 },
+          defaults: { name: 'Test Company', adminEmail: 'admin@test.com' }
+      });
+      return res.status(201).send('Test user created successfully with username: testuser, password: password123');
+    }
+    return res.status(200).send('Test user already exists.');
+  } catch (error) {
+    console.error('Error creating test user:', error);
+    return res.status(500).send('Error creating test user.');
+  }
+});
+
 // 1. Register a new Company and its Admin user
 app.post('/api/register', async (req, res) => {
   const { companyName, adminEmail, password } = req.body;
@@ -71,11 +98,10 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 4. Data submission endpoints (Now truly public)
-app.post('/api/workday-events', async (req, res) => {
+// 4. Data submission endpoints
+app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
-    const eventData = { ...req.body, userId: req.body.user_id };
-    const event = await WorkdayEvent.create(eventData);
+    const event = await WorkdayEvent.create({ ...req.body, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving workday event:', error);
@@ -83,10 +109,9 @@ app.post('/api/workday-events', async (req, res) => {
   }
 });
 
-app.post('/api/refuel-events', async (req, res) => {
+app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   try {
-    const eventData = { ...req.body, userId: req.body.user_id };
-    const event = await RefuelEvent.create(eventData);
+    const event = await RefuelEvent.create({ ...req.body, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving refuel event:', error);
@@ -94,10 +119,9 @@ app.post('/api/refuel-events', async (req, res) => {
   }
 });
 
-app.post('/api/loading-events', async (req, res) => {
+app.post('/api/loading-events', authenticateToken, async (req, res) => {
   try {
-    const eventData = { ...req.body, userId: req.body.user_id };
-    const event = await LoadingEvent.create(eventData);
+    const event = await LoadingEvent.create({ ...req.body, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving loading event:', error);
@@ -106,14 +130,8 @@ app.post('/api/loading-events', async (req, res) => {
 });
 
 
-// --- Protected Routes (require authentication) ---
-
-// Middleware is applied to all routes below this point
-app.use(authenticateToken);
-
-// 3. Create a new driver for the admin's company
-app.post('/api/users/driver', async (req, res) => {
-  // The user's role and companyId come from the authenticated token (req.user)
+// --- Protected Routes (for admin actions) ---
+app.post('/api/users/driver', authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Forbidden: Only admins can create drivers.' });
   }
@@ -128,7 +146,7 @@ app.post('/api/users/driver', async (req, res) => {
       username,
       password,
       role: 'driver',
-      companyId: req.user.companyId, // Associate with the admin's company
+      companyId: req.user.companyId,
     });
     res.status(201).json({ message: 'Driver created successfully.', userId: newDriver.id, username: newDriver.username });
   } catch (error) {
@@ -139,15 +157,12 @@ app.post('/api/users/driver', async (req, res) => {
   }
 });
 
-// TODO: Add GET endpoints for admins to retrieve and filter data
-
 // Start server and sync database
 app.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT}`);
   try {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    // Sync all models. Use { force: true } only in dev to drop and re-create tables.
     await sequelize.sync({ alter: true }); 
     console.log('All models were synchronized successfully.');
   } catch (error) {
