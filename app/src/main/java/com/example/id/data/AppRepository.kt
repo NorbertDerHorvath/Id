@@ -1,0 +1,182 @@
+package com.example.id.data
+
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.example.id.data.dao.BreakEventDao
+import com.example.id.data.dao.LoadingEventDao
+import com.example.id.data.dao.RefuelEventDao
+import com.example.id.data.dao.WorkdayEventDao
+import com.example.id.data.entities.BreakEvent
+import com.example.id.data.entities.LoadingEvent
+import com.example.id.data.entities.RefuelEvent
+import com.example.id.data.entities.WorkdayEvent
+import com.example.id.network.ApiService
+import com.example.id.services.SyncWorker
+import com.google.gson.Gson
+import kotlinx.coroutines.flow.Flow
+import java.util.Date
+import javax.inject.Inject
+
+class AppRepository @Inject constructor(
+    private val database: AppDatabase,
+    private val apiService: ApiService,
+    private val workManager: WorkManager
+) {
+
+    private val workdayEventDao = database.workdayEventDao()
+    private val breakEventDao = database.breakEventDao()
+    private val refuelEventDao = database.refuelEventDao()
+    private val loadingEventDao = database.loadingEventDao()
+
+    // Workday Events
+    suspend fun insertWorkdayEvent(event: WorkdayEvent): Long {
+        val localId = workdayEventDao.insertWorkdayEvent(event)
+        scheduleSync(SyncWorker.TYPE_WORKDAY, event.copy(id = localId))
+        return localId
+    }
+
+    suspend fun updateWorkdayEvent(event: WorkdayEvent) {
+        workdayEventDao.updateWorkdayEvent(event)
+        scheduleSync(SyncWorker.TYPE_WORKDAY, event)
+    }
+
+    // Refuel Events
+    suspend fun insertRefuelEvent(event: RefuelEvent): Long {
+        val localId = refuelEventDao.insertRefuelEvent(event)
+        scheduleSync(SyncWorker.TYPE_REFUEL, event.copy(id = localId))
+        return localId
+    }
+
+    suspend fun updateRefuelEvent(event: RefuelEvent) {
+        refuelEventDao.updateRefuelEvent(event)
+        scheduleSync(SyncWorker.TYPE_REFUEL, event)
+    }
+
+    // Loading Events
+    suspend fun insertLoadingEvent(event: LoadingEvent): Long {
+        val localId = loadingEventDao.insertLoadingEvent(event)
+        scheduleSync(SyncWorker.TYPE_LOADING, event.copy(id = localId))
+        return localId
+    }
+
+    suspend fun updateLoadingEvent(event: LoadingEvent) {
+        loadingEventDao.updateLoadingEvent(event)
+        scheduleSync(SyncWorker.TYPE_LOADING, event)
+    }
+
+    private fun scheduleSync(eventType: String, event: Any) {
+        val eventJson = Gson().toJson(event)
+        val workData = Data.Builder()
+            .putString(SyncWorker.KEY_EVENT_TYPE, eventType)
+            .putString(SyncWorker.KEY_EVENT_JSON, eventJson)
+            .build()
+
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncWorkRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+            .setInputData(workData)
+            .setConstraints(constraints)
+            .build()
+
+        workManager.enqueue(syncWorkRequest)
+    }
+
+    // --- The rest of the repository remains the same ---
+
+    fun getAllWorkdayEvents(userId: String): Flow<List<WorkdayEvent>> {
+        return workdayEventDao.getAllWorkdayEvents(userId)
+    }
+
+    suspend fun getWorkdayEventById(id: Long): WorkdayEvent? {
+        return workdayEventDao.getWorkdayEventById(id)
+    }
+
+    fun getActiveWorkdayEvent(): Flow<WorkdayEvent?> {
+        return workdayEventDao.getActiveWorkdayEvent()
+    }
+
+    fun getActiveWorkdayEvent(userId: String): Flow<WorkdayEvent?> {
+        return workdayEventDao.getActiveWorkdayEvent(userId)
+    }
+
+    fun getWorkdayEventsForReport(userId: String, startDate: Date?, endDate: Date?): Flow<List<WorkdayEvent>> {
+        return workdayEventDao.getWorkdayEventsForReport(userId, startDate, endDate)
+    }
+
+    suspend fun deleteWorkdayEventById(id: Long) {
+        workdayEventDao.deleteWorkdayEventById(id)
+    }
+
+    fun getWorkdayEventsByPlate(userId: String, carPlate: String): Flow<List<WorkdayEvent>> {
+        return workdayEventDao.getWorkdayEventsByPlate(userId, carPlate)
+    }
+
+    suspend fun insertBreakEvent(event: BreakEvent): Long {
+        return breakEventDao.insertBreakEvent(event)
+    }
+
+    suspend fun updateBreakEvent(event: BreakEvent) {
+        breakEventDao.updateBreakEvent(event)
+    }
+
+    fun getAllBreakEvents(userId: String): Flow<List<BreakEvent>> {
+        return breakEventDao.getAllBreakEvents(userId)
+    }
+
+    fun getBreaksForWorkday(workdayEventId: Long): Flow<List<BreakEvent>> {
+        return breakEventDao.getBreaksForWorkday(workdayEventId)
+    }
+
+    fun getActiveBreakEvent(userId: String): Flow<BreakEvent?> {
+        return breakEventDao.getActiveBreakEvent(userId)
+    }
+
+    fun getAllRefuelEvents(userId: String): Flow<List<RefuelEvent>> {
+        return refuelEventDao.getAllRefuelEvents(userId)
+    }
+
+    fun getRefuelEventsByCar(carPlate: String): Flow<List<RefuelEvent>> {
+        return refuelEventDao.getRefuelEventsByCar(carPlate)
+    }
+
+    fun getRefuelEventsForReport(userId: String, startDate: Date?, endDate: Date?, carPlate: String?, fuelType: String?, paymentMethod: String?): Flow<List<RefuelEvent>> {
+        return refuelEventDao.getRefuelEventsForReport(userId, startDate, endDate, carPlate, fuelType, paymentMethod)
+    }
+
+    suspend fun getRefuelEventById(id: Long): RefuelEvent? {
+        return refuelEventDao.getRefuelEventById(id)
+    }
+
+    suspend fun deleteRefuelEventById(id: Long) {
+        refuelEventDao.deleteRefuelEventById(id)
+    }
+
+    fun getAllLoadingEvents(userId: String): Flow<List<LoadingEvent>> {
+        return loadingEventDao.getAllLoadingEvents(userId)
+    }
+
+    fun getActiveLoadingEvent(userId: String): Flow<LoadingEvent?> {
+        return loadingEventDao.getActiveLoadingEvent(userId)
+    }
+
+    fun getLoadingsForWorkday(workdayEventId: Long): Flow<List<LoadingEvent>> {
+        return loadingEventDao.getLoadingsForWorkday(workdayEventId)
+    }
+
+    fun getLoadingEventsForReport(userId: String, startDate: Date?, endDate: Date?): Flow<List<LoadingEvent>> {
+        return loadingEventDao.getLoadingEventsForReport(userId, startDate, endDate)
+    }
+
+    suspend fun getLoadingEventById(id: Long): LoadingEvent? {
+        return loadingEventDao.getLoadingEventById(id)
+    }
+
+    suspend fun deleteLoadingEventById(id: Long) {
+        loadingEventDao.deleteLoadingEventById(id)
+    }
+}
