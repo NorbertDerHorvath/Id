@@ -71,6 +71,41 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// 4. Data submission endpoints (Now truly public)
+app.post('/api/workday-events', async (req, res) => {
+  try {
+    const eventData = { ...req.body, userId: req.body.user_id };
+    const event = await WorkdayEvent.create(eventData);
+    res.status(201).json(event);
+  } catch (error) {
+    console.error('Error saving workday event:', error);
+    res.status(500).json({ error: 'Failed to save workday event.' });
+  }
+});
+
+app.post('/api/refuel-events', async (req, res) => {
+  try {
+    const eventData = { ...req.body, userId: req.body.user_id };
+    const event = await RefuelEvent.create(eventData);
+    res.status(201).json(event);
+  } catch (error) {
+    console.error('Error saving refuel event:', error);
+    res.status(500).json({ error: 'Failed to save refuel event.' });
+  }
+});
+
+app.post('/api/loading-events', async (req, res) => {
+  try {
+    const eventData = { ...req.body, userId: req.body.user_id };
+    const event = await LoadingEvent.create(eventData);
+    res.status(201).json(event);
+  } catch (error) {
+    console.error('Error saving loading event:', error);
+    res.status(500).json({ error: 'Failed to save loading event.' });
+  }
+});
+
+
 // --- Protected Routes (require authentication) ---
 
 // Middleware is applied to all routes below this point
@@ -101,37 +136,6 @@ app.post('/api/users/driver', async (req, res) => {
       return res.status(409).json({ error: 'Username already exists.' });
     }
     res.status(500).json({ error: 'Server error creating driver.' });
-  }
-});
-
-// 4. Data submission endpoints
-app.post('/api/workday-events', async (req, res) => {
-  try {
-    const event = await WorkdayEvent.create({ ...req.body, userId: req.user.userId });
-    res.status(201).json(event);
-  } catch (error) {
-    console.error('Error saving workday event:', error);
-    res.status(500).json({ error: 'Failed to save workday event.' });
-  }
-});
-
-app.post('/api/refuel-events', async (req, res) => {
-  try {
-    const event = await RefuelEvent.create({ ...req.body, userId: req.user.userId });
-    res.status(201).json(event);
-  } catch (error) {
-    console.error('Error saving refuel event:', error);
-    res.status(500).json({ error: 'Failed to save refuel event.' });
-  }
-});
-
-app.post('/api/loading-events', async (req, res) => {
-  try {
-    const event = await LoadingEvent.create({ ...req.body, userId: req.user.userId });
-    res.status(201).json(event);
-  } catch (error) {
-    console.error('Error saving loading event:', error);
-    res.status(500).json({ error: 'Failed to save loading event.' });
   }
 });
 

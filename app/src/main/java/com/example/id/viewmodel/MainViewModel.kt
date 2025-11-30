@@ -24,6 +24,7 @@ import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.services.TrackingService
 import com.example.id.util.DataManager
+import com.example.id.util.NetworkClient
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.delay
@@ -341,6 +342,17 @@ class MainViewModel(
                     Intent(application, TrackingService::class.java).also {
                         it.action = TrackingService.ACTION_STOP_SERVICE
                         application.startService(it)
+                    }
+                    // Send to server
+                    try {
+                        val response = NetworkClient.instance.postWorkday(updatedWorkday)
+                        if (response.isSuccessful) {
+                            Log.d("MainViewModel", "Workday sent to server successfully.")
+                        } else {
+                            Log.e("MainViewModel", "Failed to send workday to server: ${response.errorBody()?.string()}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainViewModel", "Error sending workday to server: ${e.message}", e)
                     }
                 }
             } catch (e: Exception) {
