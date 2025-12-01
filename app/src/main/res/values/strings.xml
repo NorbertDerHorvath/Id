@@ -146,6 +146,8 @@
     <string name="unit_km">km</string>
     <string name="not_available">N/A</string>
     <string name="liter_unit">L</string>
+    <string name="login">Bejelentkezés</string>
+    <string name="logout">Kijelentkezés</string>
     <plurals name="days_plural">
         <item quantity="one">%d nap</item>
         <item quantity="other">%d nap</item>

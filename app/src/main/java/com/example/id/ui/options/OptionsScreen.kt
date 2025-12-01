@@ -10,6 +10,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.id.R
 import com.example.id.viewmodel.MainViewModel
+import com.example.id.viewmodel.LoginUiState
 
 @Composable
 fun OptionsScreen(navController: NavController, viewModel: MainViewModel = hiltViewModel()) {
@@ -28,19 +29,22 @@ fun OptionsScreen(navController: NavController, viewModel: MainViewModel = hiltV
 
         Spacer(modifier = Modifier.weight(1f))
 
-        if (loginState) {
-            Button(
-                onClick = { viewModel.logout() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(id = R.string.logout))
+        when (loginState) {
+            is LoginUiState.Success -> {
+                Button(
+                    onClick = { viewModel.logout() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(id = R.string.logout))
+                }
             }
-        } else {
-            Button(
-                onClick = { navController.navigate("login") },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(id = R.string.login))
+            else -> {
+                Button(
+                    onClick = { navController.navigate("login") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(id = R.string.login))
+                }
             }
         }
 

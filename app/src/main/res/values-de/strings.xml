@@ -143,6 +143,8 @@
     <string name="unit_km">km</string>
     <string name="not_available">N/A</string>
     <string name="liter_unit">L</string>
+    <string name="login">Anmelden</string>
+    <string name="logout">Abmelden</string>
     <plurals name="days_plural">
         <item quantity="one">%d Tag</item>
         <item quantity="other">%d Tage</item>
