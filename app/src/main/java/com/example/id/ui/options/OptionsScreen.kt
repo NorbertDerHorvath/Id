@@ -1,19 +1,20 @@
 package com.example.id.ui.options
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.id.R
 import com.example.id.viewmodel.MainViewModel
 
 @Composable
-fun OptionsScreen(navController: NavController, viewModel: MainViewModel) {
+fun OptionsScreen(navController: NavController, viewModel: MainViewModel = hiltViewModel()) {
+    val loginState by viewModel.loginState.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -25,9 +26,25 @@ fun OptionsScreen(navController: NavController, viewModel: MainViewModel) {
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Removed remainingHolidays related UI elements
-
         Spacer(modifier = Modifier.weight(1f))
+
+        if (loginState) {
+            Button(
+                onClick = { viewModel.logout() },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(id = R.string.logout))
+            }
+        } else {
+            Button(
+                onClick = { navController.navigate("login") },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(id = R.string.login))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         Button(
             onClick = { navController.popBackStack() },

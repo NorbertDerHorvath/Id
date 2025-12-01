@@ -95,7 +95,6 @@ import com.example.id.ui.theme.IdTheme
 import com.example.id.util.DataManager
 import com.example.id.util.LocaleManager
 import com.example.id.viewmodel.LoginUiState
-import com.example.id.viewmodel.LoginViewModel
 import com.example.id.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -155,13 +154,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppContent(action: MutableState<String?>) {
     IdTheme {
-        val loginViewModel: LoginViewModel = hiltViewModel()
-        val loginState by loginViewModel.loginState.collectAsState()
+        val mainViewModel: MainViewModel = hiltViewModel()
+        val loginState by mainViewModel.loginState.collectAsState()
 
         val navController = rememberNavController()
 
         LaunchedEffect(Unit) {
-            loginViewModel.validateToken()
+            mainViewModel.validateToken()
         }
 
         val startDestination = when (loginState) {
@@ -171,7 +170,7 @@ fun AppContent(action: MutableState<String?>) {
 
         NavHost(navController = navController, startDestination = startDestination) {
             composable("login") {
-                LoginScreen(navController = navController)
+                LoginScreen(navController = navController, viewModel = mainViewModel)
             }
             composable("role_selection") {
                 RoleSelectionScreen(navController = navController)
@@ -180,8 +179,6 @@ fun AppContent(action: MutableState<String?>) {
                 InitialSetupScreen(navController = navController)
             }
             composable("main") {
-                val mainViewModel: MainViewModel = hiltViewModel()
-
                 MainScreen(
                     viewModel = mainViewModel,
                     navController = navController,
@@ -189,49 +186,39 @@ fun AppContent(action: MutableState<String?>) {
                 )
             }
             composable("summary") {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 val summaryText by mainViewModel.summaryText.collectAsState()
                 SummaryScreen(navController = navController, summaryText = summaryText)
             }
              composable("manual_data_entry") {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 ManualDataEntryScreen(navController = navController, viewModel = mainViewModel)
             }
             composable("reports") {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 ReportsScreen(navController = navController, viewModel = mainViewModel)
             }
             composable("options") {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 OptionsScreen(navController = navController, viewModel = mainViewModel)
             }
             composable("new_event") {
-                 val mainViewModel: MainViewModel = hiltViewModel()
                  val prefs = LocalContext.current.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                  val defaultCar = prefs.getString(DEFAULT_CAR_KEY, null)
                 NewEventScreen(navController = navController, viewModel = mainViewModel, defaultCar = defaultCar)
             }
             composable("new_workday") {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 NewWorkdayScreen(navController = navController, viewModel = mainViewModel)
             }
             composable("edit_workday/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 val id = it.arguments?.getLong("id") ?: 0L
                 EditWorkdayScreen(navController = navController, viewModel = mainViewModel, workdayId = id)
             }
             composable("edit_refuel/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 val id = it.arguments?.getLong("id") ?: 0L
                 EditRefuelScreen(navController = navController, viewModel = mainViewModel, refuelId = id)
             }
             composable("edit_loading/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 val id = it.arguments?.getLong("id") ?: 0L
                 EditLoadingScreen(navController = navController, viewModel = mainViewModel, loadingId = id)
             }
             composable("absence/{type}", arguments = listOf(navArgument("type") { type = NavType.StringType })) {
-                val mainViewModel: MainViewModel = hiltViewModel()
                 val type = it.arguments?.getString("type") ?: ""
                 AbsenceScreen(navController = navController, viewModel = mainViewModel, absenceType = type)
             }

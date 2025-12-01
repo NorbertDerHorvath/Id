@@ -20,6 +20,7 @@ import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
+import com.example.id.repository.AuthRepository
 import com.example.id.services.TrackingService
 import com.example.id.util.ApiService
 import com.example.id.util.DataManager
@@ -37,14 +38,25 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.coroutines.resume
 
+sealed class LoginUiState {
+    object Idle : LoginUiState()
+    object Loading : LoginUiState()
+    object Success : LoginUiState()
+    data class Error(val message: String) : LoginUiState()
+}
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
+    private val authRepository: AuthRepository,
     private val apiService: ApiService,
     private val prefs: SharedPreferences,
     private val dataManager: DataManager
 ) : ViewModel() {
+
+    private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
+    val loginState: StateFlow<LoginUiState> = _loginState
 
     private val userId: String = prefs.getString(USER_NAME_KEY, "unknown_user")!!
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
@@ -76,6 +88,51 @@ class MainViewModel @Inject constructor(
                 activeWorkdayEvent = event
             }
         }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            _loginState.value = LoginUiState.Loading
+            try {
+                val response = authRepository.login(username, password)
+                if (response.isSuccessful && response.body() != null) {
+                    authRepository.saveToken(response.body()!!.token)
+                    _loginState.value = LoginUiState.Success
+                } else {
+                    val errorBody = response.errorBody()?.string() ?: "Unknown login error"
+                    _loginState.value = LoginUiState.Error(errorBody)
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
+    fun validateToken() {
+        viewModelScope.launch {
+            val token = authRepository.getToken()
+            if (token == null) {
+                _loginState.value = LoginUiState.Error("No token found")
+                return@launch
+            }
+
+            try {
+                val response = authRepository.validateToken(token)
+                if (response.isSuccessful && response.body()?.valid == true) {
+                    _loginState.value = LoginUiState.Success
+                } else {
+                    authRepository.clearToken()
+                    _loginState.value = LoginUiState.Error("Invalid token")
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
+    fun logout() {
+        authRepository.clearToken()
+        _loginState.value = LoginUiState.Idle
     }
 
     fun startWorkday(odometer: Int?, carPlate: String?) {

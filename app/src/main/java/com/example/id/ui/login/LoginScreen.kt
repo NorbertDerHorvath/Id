@@ -12,12 +12,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.id.viewmodel.LoginUiState
-import com.example.id.viewmodel.LoginViewModel
+import com.example.id.viewmodel.MainViewModel
 
 @Composable
 fun LoginScreen(
     navController: NavController,
-    viewModel: LoginViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel()
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
