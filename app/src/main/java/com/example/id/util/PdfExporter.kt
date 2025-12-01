@@ -18,15 +18,14 @@ import com.example.id.R
 import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
+import com.example.id.data.entities.Workday
+import com.example.id.data.entities.WorkdayReportItem
 import com.example.id.viewmodel.MainViewModel
-import com.example.id.viewmodel.WorkdayReportItem
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 // Helper extension function to get a Date object at midnight
 fun Date.toMidnight(): Date {
@@ -465,7 +464,7 @@ class PdfExporter(private val context: Context) {
             val max = calendar.time.toMidnight()
             min to max
         } else {
-            val earliestEventDate = items.minOf { it.workday.startTime.toMidnight() }
+            val earliestEventDate = items.minOf { it.workday.startTime }.toMidnight()
             val latestEventDate = items.maxOf { it.workday.endTime?.toMidnight() ?: it.workday.startTime.toMidnight() }
 
             calendar.time = earliestEventDate
@@ -479,7 +478,7 @@ class PdfExporter(private val context: Context) {
         }
 
         // Pre-process items into a map for easier lookup
-        val dailyItems = mutableMapOf<Date, MutableList<WorkdayReportItem>>()
+        val dailyItems: MutableMap<Date, MutableList<WorkdayReportItem>> = mutableMapOf()
         items.forEach { item ->
             when (item.workday.type) {
                 EventType.WORK -> {
@@ -508,7 +507,7 @@ class PdfExporter(private val context: Context) {
                 currentPageRows.add(Pair(listOf("SEPARATOR"), -1))
             }
 
-            val itemsForDay = dailyItems[currentDate] ?: emptyList()
+            val itemsForDay = dailyItems[currentDate] ?: emptyList<WorkdayReportItem>()
 
             val workEvents = itemsForDay.filter { it.workday.type == EventType.WORK }
             val vacationSickLeaveEvents = itemsForDay.filter { it.workday.type == EventType.VACATION || it.workday.type == EventType.SICK_LEAVE }
@@ -531,7 +530,7 @@ class PdfExporter(private val context: Context) {
                         viewModel.formatDuration(item.totalBreakDuration),
                         item.workday.startOdometer?.toString() ?: "-",
                         item.workday.endOdometer?.toString() ?: "-",
-                        if (item.workday.startOdometer != null && item.workday.endOdometer != null) (item.workday.endOdometer - item.workday.startOdometer).toString() else "-",
+                        if (item.workday.startOdometer != null && item.workday.endOdometer != null) (item.workday.endOdometer!! - item.workday.startOdometer!!).toString() else "-",
                         viewModel.formatDuration(item.netWorkDuration)
                     ), dayOfWeek))
                 }
@@ -619,7 +618,7 @@ class PdfExporter(private val context: Context) {
 
         val data = items.sortedBy { it.startTime }.mapIndexed { index, event ->
             val duration = if (event.startTime != null && event.endTime != null) {
-                event.endTime.time - event.startTime.time
+                event.endTime!!.time - event.startTime!!.time
             } else {
                 null
             }

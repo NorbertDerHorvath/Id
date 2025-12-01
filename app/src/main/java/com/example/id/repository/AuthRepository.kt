@@ -4,6 +4,8 @@ import android.content.SharedPreferences
 import com.example.id.util.ApiService
 import com.example.id.util.LoginRequest
 import com.example.id.util.LoginResponse
+import com.example.id.util.ValidateRequest
+import com.example.id.util.ValidateResponse
 import retrofit2.Response
 import javax.inject.Inject
 
@@ -16,11 +18,19 @@ class AuthRepository @Inject constructor(
         return apiService.login(LoginRequest(username, password))
     }
 
+    suspend fun validateToken(token: String): Response<ValidateResponse> {
+        return apiService.validateToken(ValidateRequest(token))
+    }
+
     fun saveToken(token: String) {
         prefs.edit().putString("auth_token", token).apply()
     }
 
     fun getToken(): String? {
         return prefs.getString("auth_token", null)
+    }
+
+    fun clearToken() {
+        prefs.edit().remove("auth_token").apply()
     }
 }

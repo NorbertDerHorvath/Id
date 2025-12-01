@@ -16,10 +16,21 @@ data class LoginResponse(
     val message: String
 )
 
+data class ValidateRequest(
+    val token: String
+)
+
+data class ValidateResponse(
+    val valid: Boolean
+)
+
 interface ApiService {
     @POST("api/workday-events")
     suspend fun postWorkday(@Body workday: WorkdayEvent): Response<Void>
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+
+    @POST("api/validate-token")
+    suspend fun validateToken(@Body request: ValidateRequest): Response<ValidateResponse>
 }

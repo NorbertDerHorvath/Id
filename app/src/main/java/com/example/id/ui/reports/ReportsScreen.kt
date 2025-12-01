@@ -18,9 +18,10 @@ import com.example.id.R
 import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
+import com.example.id.data.entities.WorkdayReportItem
+import com.example.id.data.entities.Workday
 import com.example.id.util.PdfExporter
 import com.example.id.viewmodel.MainViewModel
-import com.example.id.viewmodel.WorkdayReportItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -335,6 +336,7 @@ fun WorkdayResultCard(item: WorkdayReportItem, viewModel: MainViewModel) {
                 EventType.WORK -> stringResource(R.string.workday)
                 EventType.VACATION -> stringResource(R.string.vacation)
                 EventType.SICK_LEAVE -> stringResource(R.string.sick_leave)
+                else -> ""
             }
             Text(title, style = MaterialTheme.typography.titleMedium)
 

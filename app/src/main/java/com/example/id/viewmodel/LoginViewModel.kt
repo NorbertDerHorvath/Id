@@ -41,4 +41,26 @@ class LoginViewModel @Inject constructor(
             }
         }
     }
+
+    fun validateToken() {
+        viewModelScope.launch {
+            val token = authRepository.getToken()
+            if (token == null) {
+                _loginState.value = LoginUiState.Error("No token found")
+                return@launch
+            }
+
+            try {
+                val response = authRepository.validateToken(token)
+                if (response.isSuccessful && response.body()?.valid == true) {
+                    _loginState.value = LoginUiState.Success
+                } else {
+                    authRepository.clearToken()
+                    _loginState.value = LoginUiState.Error("Invalid token")
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
+            }
+        }
+    }
 }

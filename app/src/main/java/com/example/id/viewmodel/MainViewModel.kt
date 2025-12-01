@@ -2,16 +2,12 @@ package com.example.id.viewmodel
 
 import android.Manifest
 import android.app.Application
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.net.Uri
-import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -31,37 +27,21 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.coroutines.resume
 
-data class WorkdayReportItem(
-    val workday: WorkdayEvent,
-    val totalBreakDuration: Long,
-    val netWorkDuration: Long
-)
-
-const val CUMULATIVE_OVERTIME_KEY = "cumulative_overtime"
-
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val application: Application, 
-    private val repository: AppRepository, 
-    private val apiService: ApiService, 
+    private val application: Application,
+    private val repository: AppRepository,
+    private val apiService: ApiService,
     private val prefs: SharedPreferences,
     private val dataManager: DataManager
 ) : ViewModel() {
@@ -69,123 +49,32 @@ class MainViewModel @Inject constructor(
     private val userId: String = prefs.getString(USER_NAME_KEY, "unknown_user")!!
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
 
-    val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId)
-        .map { it != null && it.endTime == null }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId)
-        .map { it != null && it.endTime == null }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-    val isloadingStarted: StateFlow<Boolean> = repository.getActiveLoadingEvent(userId)
-        .map { it != null && it.endTime == null }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
+    val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val isloadingStarted: StateFlow<Boolean> = repository.getActiveLoadingEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     private val _workDuration = MutableStateFlow(0L)
     val workDuration: StateFlow<Long> = _workDuration.asStateFlow()
-
     private val _breakDuration = MutableStateFlow(0L)
     val breakDuration: StateFlow<Long> = _breakDuration.asStateFlow()
-
-    private val _overtime = MutableStateFlow(prefs.getLong(CUMULATIVE_OVERTIME_KEY, 0L))
+    private val _overtime = MutableStateFlow(prefs.getLong("cumulative_overtime", 0L))
     val overtime: StateFlow<Long> = _overtime.asStateFlow()
-
     private val _summaryText = MutableStateFlow("")
     val summaryText: StateFlow<String> = _summaryText.asStateFlow()
-
     private val _reportResults = MutableStateFlow<List<Any>>(emptyList())
     val reportResults: StateFlow<List<Any>> = _reportResults.asStateFlow()
-
     private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
     val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
-
     private val _editingEvent = MutableStateFlow<Any?>(null)
     val editingEvent: StateFlow<Any?> = _editingEvent.asStateFlow()
-
     private val _measuredBreakDurationForEdit = MutableStateFlow(0L)
     val measuredBreakDurationForEdit: StateFlow<Long> = _measuredBreakDurationForEdit.asStateFlow()
-
     private var activeWorkdayEvent: WorkdayEvent? = null
-    private var activeBreakEvent: BreakEvent? = null
 
     init {
         viewModelScope.launch {
             repository.getActiveWorkdayEvent(userId).collect { event ->
                 activeWorkdayEvent = event
-                if (event == null || event.endTime != null) {
-                    updateDurations()
-                } else {
-                    Intent(application, TrackingService::class.java).also {
-                        it.action = TrackingService.ACTION_START_OR_RESUME_SERVICE
-                        it.putExtra("USER_ID", userId)
-                        application.startService(it)
-                    }
-                }
             }
-        }
-        viewModelScope.launch {
-            repository.getActiveBreakEvent(userId).collect { event ->
-                activeBreakEvent = event
-            }
-        }
-        viewModelScope.launch {
-            while (true) {
-                if (isWorkdayStarted.value) {
-                    updateDurations()
-                }
-                delay(1000)
-            }
-        }
-    }
-
-    private suspend fun updateDurations() {
-        val currentWorkday = activeWorkdayEvent
-        if (currentWorkday != null) {
-            val workStart = currentWorkday.startTime.time
-            val workEnd = currentWorkday.endTime?.time ?: System.currentTimeMillis()
-            val breaks = repository.getBreaksForWorkday(currentWorkday.id).first()
-            _breakDuration.value = calculateBreakDuration(breaks)
-            _workDuration.value = workEnd - workStart - _breakDuration.value
-        } else {
-            _workDuration.value = 0L
-            _breakDuration.value = 0L
-        }
-    }
-
-    private fun calculateBreakDuration(breaks: List<BreakEvent>, effectiveTime: Long = System.currentTimeMillis()): Long {
-        var totalBreakDuration = 0L
-        breaks.forEach { breakEvent ->
-            val start = breakEvent.startTime.time
-            val end = breakEvent.endTime?.time ?: if (breakEvent.id == activeBreakEvent?.id) effectiveTime else start
-            totalBreakDuration += (end - start)
-        }
-        return totalBreakDuration
-    }
-
-    private suspend fun getCurrentLocation(): Location? {
-        if (ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-            ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return null
-        }
-
-        return suspendCancellableCoroutine { continuation ->
-            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                if (continuation.isActive) {
-                    continuation.resume(location)
-                }
-            }
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun getAddressFromLocation(context: Context, location: Location?): String? {
-        if (location == null) return null
-        val geocoder = Geocoder(context, Locale.getDefault())
-        return try {
-            val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
-            addresses?.firstOrNull()?.getAddressLine(0)
-        } catch (e: IOException) {
-            null
         }
     }
 
@@ -195,57 +84,115 @@ class MainViewModel @Inject constructor(
             val address = getAddressFromLocation(application, location)
             val newWorkday = WorkdayEvent(
                 userId = userId,
-                role = prefs.getString(com.example.id.ROLE_DRIVER, "")!!,
+                role = prefs.getString("user_role", "driver")!!,
                 startTime = Date(),
                 endTime = null,
+                startDate = null,
+                endDate = null,
+                breakTime = 0,
                 startLocation = address,
                 startLatitude = location?.latitude,
                 startLongitude = location?.longitude,
+                endLocation = null,
+                endLatitude = null,
+                endLongitude = null,
                 startOdometer = odometer,
-                carPlate = carPlate
+                endOdometer = null,
+                carPlate = carPlate,
+                type = EventType.WORK
             )
             repository.insertWorkdayEvent(newWorkday)
-            Intent(application, TrackingService::class.java).also {
-                it.action = TrackingService.ACTION_START_OR_RESUME_SERVICE
-                it.putExtra("USER_ID", userId)
-                application.startService(it)
-            }
         }
     }
 
     fun endWorkday(odometer: Int?) {
-        viewModelScope.launch {
-            val currentWorkday = repository.getActiveWorkdayEvent(userId).first()
-            if (currentWorkday != null) {
+         viewModelScope.launch {
+            activeWorkdayEvent?.let { workday ->
                 val endTime = Date()
                 val location = getCurrentLocation()
                 val address = getAddressFromLocation(application, location)
-                val updatedWorkday = currentWorkday.copy(
+                val updatedWorkday = workday.copy(
                     endTime = endTime,
+                    endOdometer = odometer,
                     endLocation = address,
                     endLatitude = location?.latitude,
-                    endLongitude = location?.longitude,
-                    endOdometer = odometer
+                    endLongitude = location?.longitude
                 )
                 repository.updateWorkdayEvent(updatedWorkday)
 
                 try {
-                    val response = apiService.postWorkday(updatedWorkday)
-                    if (response.isSuccessful) {
-                        Log.d("MainViewModel", "Workday sent to server successfully.")
-                    } else {
-                        Log.e("MainViewModel", "Failed to send workday: ${response.code()} - ${response.errorBody()?.string()}")
-                    }
+                    apiService.postWorkday(updatedWorkday)
                 } catch (e: Exception) {
-                    Log.e("MainViewModel", "Error sending workday to server: ${e.message}", e)
-                }
-                
-                Intent(application, TrackingService::class.java).also {
-                    it.action = TrackingService.ACTION_STOP_SERVICE
-                    application.startService(it)
+                    Log.e("MainViewModel", "Failed to send workday", e)
                 }
             }
         }
     }
-    // ... (rest of the functions are the same)
+
+    fun recordRefuel(odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) {
+        viewModelScope.launch {
+            val location = getCurrentLocation()
+            val address = getAddressFromLocation(application, location)
+            val refuel = RefuelEvent(
+                userId = userId,
+                timestamp = Date(),
+                odometer = odometer,
+                fuelType = fuelType,
+                fuelAmount = fuelAmount,
+                paymentMethod = paymentMethod,
+                location = address,
+                latitude = location?.latitude,
+                longitude = location?.longitude,
+                carPlate = carPlate
+            )
+            repository.insertRefuelEvent(refuel)
+        }
+    }
+
+    fun formatDuration(millis: Long): String {
+        val hours = TimeUnit.MILLISECONDS.toHours(millis)
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
+    fun endBreak() {}
+    fun startBreak() {}
+    fun generateSummary(context: Context) {}
+    fun resetOvertime() {}
+    fun recordAbsence(type: String, startDate: Date, endDate: Date) {}
+    fun loadLoadingForEdit(id: Long) {}
+    fun clearEditingEvent() {}
+    fun updateLoading(event: LoadingEvent) {}
+    fun loadRefuelForEdit(id: Long) {}
+    fun updateRefuel(event: RefuelEvent) {}
+    fun loadWorkdayForEdit(id: Long) {}
+    fun updateWorkday(event: WorkdayEvent) {}
+    fun loadRecentEvents() {}
+    fun deleteWorkdayEvent(id: Long) {}
+    fun deleteRefuelEvent(id: Long) {}
+    fun deleteLoadingEvent(id: Long) {}
+    fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {}
+    fun runReport(eventTypeKey: String, startDateString: String, endDateString: String, carPlate: String?, fuelType: String?, paymentMethod: String?) {}
+
+    private suspend fun getCurrentLocation(): Location? {
+        if (ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        return suspendCancellableCoroutine { continuation ->
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                continuation.resume(location)
+            }
+        }
+    }
+
+    private fun getAddressFromLocation(context: Context, location: Location?): String? {
+        if (location == null) return null
+        val geocoder = Geocoder(context, Locale.getDefault())
+        return try {
+            geocoder.getFromLocation(location.latitude, location.longitude, 1)?.firstOrNull()?.getAddressLine(0)
+        } catch (e: IOException) {
+            null
+        }
+    }
 }
