@@ -1,10 +1,10 @@
 package com.example.id.di
 
 import android.content.Context
-import androidx.room.Room
-import androidx.work.WorkManager
-import com.example.id.data.AppDatabase
-import com.example.id.util.LocationProvider
+import android.content.SharedPreferences
+import com.example.id.PREFS_NAME
+import com.example.id.util.ApiService
+import com.example.id.util.NetworkClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,19 +18,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideLocationProvider(@ApplicationContext context: Context): LocationProvider {
-        return LocationProvider(context)
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     @Provides
     @Singleton
-    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-        return AppDatabase.getDatabase(context)
-    }
-
-    @Provides
-    @Singleton
-    fun provideWorkManager(@ApplicationContext context: Context): WorkManager {
-        return WorkManager.getInstance(context)
+    fun provideApiService(prefs: SharedPreferences): ApiService {
+        return NetworkClient.create(prefs)
     }
 }
