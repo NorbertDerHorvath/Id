@@ -26,6 +26,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -59,13 +60,13 @@ class MainViewModel @Inject constructor(
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState
 
-    private val _userId = MutableStateFlow(prefs.getString(USER_NAME_KEY, "unknown_user")!!)
+    private val _userId = MutableStateFlow(prefs.getString(USER_NAME_KEY, "unknown_user") ?: "unknown_user")
 
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
 
-    val isWorkdayStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveWorkdayEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isBreakStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveBreakEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isloadingStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveLoadingEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isWorkdayStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveWorkdayEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isBreakStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveBreakEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isloadingStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveLoadingEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
     private val _workDuration = MutableStateFlow(0L)
     val workDuration: StateFlow<Long> = _workDuration.asStateFlow()
     private val _breakDuration = MutableStateFlow(0L)
@@ -86,7 +87,7 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _userId.flatMapLatest { id ->
+            _userId.filter { it != "unknown_user" }.flatMapLatest { id ->
                 repository.getActiveWorkdayEvent(id)
             }.collect { event ->
                 activeWorkdayEvent = event
@@ -256,6 +257,7 @@ class MainViewModel @Inject constructor(
     fun updateWorkday(event: WorkdayEvent) {}
     fun loadRecentEvents() {
         viewModelScope.launch {
+            if (_userId.value == "unknown_user") return@launch
             val allEvents = mutableListOf<Any>()
             allEvents.addAll(repository.getRecentWorkdayEvents(_userId.value))
             allEvents.addAll(repository.getRecentRefuelEvents(_userId.value))
