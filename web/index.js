@@ -18,9 +18,9 @@ app.use(express.json());
 app.get('/api/create-test-user', async (req, res) => {
   try {
     const [user, created] = await User.findOrCreate({
-      where: { username: 'testuser' },
+      where: { username: 'norbi' },
       defaults: {
-        password: 'password123', // bcrypt will hash this automatically
+        password: 'norbi', // bcrypt will hash this automatically
         role: 'driver',
         companyId: 1 // Assuming a company with ID 1 exists, or adjust as needed
       }
@@ -32,7 +32,7 @@ app.get('/api/create-test-user', async (req, res) => {
           where: { id: 1 },
           defaults: { name: 'Test Company', adminEmail: 'admin@test.com' }
       });
-      return res.status(201).send('Test user created successfully with username: testuser, password: password123');
+      return res.status(201).send('Test user created successfully with username: norbi, password: norbi');
     }
     return res.status(200).send('Test user already exists.');
   } catch (error) {

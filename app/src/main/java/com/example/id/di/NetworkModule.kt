@@ -1,7 +1,7 @@
 package com.example.id.di
 
-import com.example.id.BuildConfig
-import com.example.id.network.ApiService
+import com.example.id.network.ApiService as NetworkApiService
+import com.example.id.util.ApiService as UtilApiService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,10 +33,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        // Construct a valid base URL
-        val baseUrl = "http://${BuildConfig.SERVER_IP}/"
         return Retrofit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl("https://bok-server.onrender.com/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -44,7 +42,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService {
-        return retrofit.create(ApiService::class.java)
+    fun provideApiService(retrofit: Retrofit): NetworkApiService {
+        return retrofit.create(NetworkApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideUtilApiService(retrofit: Retrofit): UtilApiService {
+        return retrofit.create(UtilApiService::class.java)
     }
 }
