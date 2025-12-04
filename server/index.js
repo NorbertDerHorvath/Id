@@ -66,7 +66,7 @@ app.post('/api/login', async (req, res) => {
       { expiresIn: '30d' } // Token expires in 30 days
     );
 
-    res.json({ message: 'Login successful', token });
+    res.json({ message: 'Login successful', token, username: user.username });
 
   } catch (error) {
     console.error('Login error:', error);

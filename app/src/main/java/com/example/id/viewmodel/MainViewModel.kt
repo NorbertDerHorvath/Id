@@ -22,9 +22,11 @@ import com.example.id.util.ApiService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -45,6 +47,7 @@ sealed class LoginUiState {
 }
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
@@ -56,12 +59,13 @@ class MainViewModel @Inject constructor(
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState
 
-    private val userId: String = prefs.getString(USER_NAME_KEY, "unknown_user")!!
+    private val _userId = MutableStateFlow(prefs.getString(USER_NAME_KEY, "unknown_user")!!)
+
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
 
-    val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isloadingStarted: StateFlow<Boolean> = repository.getActiveLoadingEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isWorkdayStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveWorkdayEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isBreakStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveBreakEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isloadingStarted: StateFlow<Boolean> = _userId.flatMapLatest { id -> repository.getActiveLoadingEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
     private val _workDuration = MutableStateFlow(0L)
     val workDuration: StateFlow<Long> = _workDuration.asStateFlow()
     private val _breakDuration = MutableStateFlow(0L)
@@ -82,7 +86,9 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            repository.getActiveWorkdayEvent(userId).collect { event ->
+            _userId.flatMapLatest { id ->
+                repository.getActiveWorkdayEvent(id)
+            }.collect { event ->
                 activeWorkdayEvent = event
             }
         }
@@ -94,7 +100,10 @@ class MainViewModel @Inject constructor(
             try {
                 val response = authRepository.login(username, password)
                 if (response.isSuccessful && response.body() != null) {
-                    authRepository.saveToken(response.body()!!.token)
+                    val body = response.body()!!
+                    authRepository.saveToken(body.token)
+                    prefs.edit().putString(USER_NAME_KEY, body.username).apply()
+                    _userId.value = body.username
                     _loginState.value = LoginUiState.Success
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
@@ -117,6 +126,7 @@ class MainViewModel @Inject constructor(
             try {
                 val response = authRepository.validateToken(token)
                 if (response.isSuccessful && response.body()?.valid == true) {
+                    _userId.value = prefs.getString(USER_NAME_KEY, "unknown_user")!!
                     _loginState.value = LoginUiState.Success
                 } else {
                     authRepository.clearToken()
@@ -130,6 +140,8 @@ class MainViewModel @Inject constructor(
 
     fun logout() {
         authRepository.clearToken()
+        prefs.edit().remove(USER_NAME_KEY).apply()
+        _userId.value = "unknown_user"
         _loginState.value = LoginUiState.Idle
     }
 
@@ -138,7 +150,7 @@ class MainViewModel @Inject constructor(
             val location = getCurrentLocation()
             val address = getAddressFromLocation(application, location)
             val newWorkday = WorkdayEvent(
-                userId = userId,
+                userId = _userId.value,
                 role = prefs.getString("user_role", "driver")!!,
                 startTime = Date(),
                 endTime = null,
@@ -200,7 +212,7 @@ class MainViewModel @Inject constructor(
             val location = getCurrentLocation()
             val address = getAddressFromLocation(application, location)
             val refuel = RefuelEvent(
-                userId = userId,
+                userId = _userId.value,
                 timestamp = Date(),
                 odometer = odometer,
                 fuelType = fuelType,
@@ -245,9 +257,9 @@ class MainViewModel @Inject constructor(
     fun loadRecentEvents() {
         viewModelScope.launch {
             val allEvents = mutableListOf<Any>()
-            allEvents.addAll(repository.getRecentWorkdayEvents(userId))
-            allEvents.addAll(repository.getRecentRefuelEvents(userId))
-            allEvents.addAll(repository.getRecentLoadingEvents(userId))
+            allEvents.addAll(repository.getRecentWorkdayEvents(_userId.value))
+            allEvents.addAll(repository.getRecentRefuelEvents(_userId.value))
+            allEvents.addAll(repository.getRecentLoadingEvents(_userId.value))
             _recentEvents.value = allEvents.sortedByDescending { event ->
                 when (event) {
                     is WorkdayEvent -> event.startTime

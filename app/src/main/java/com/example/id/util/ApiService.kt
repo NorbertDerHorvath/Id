@@ -14,7 +14,8 @@ data class LoginRequest(
 
 data class LoginResponse(
     val token: String,
-    val message: String
+    val message: String,
+    val username: String
 )
 
 data class ValidateRequest(

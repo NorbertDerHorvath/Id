@@ -1,6 +1,7 @@
 package com.example.id.repository
 
 import android.content.SharedPreferences
+import com.example.id.AUTH_TOKEN_KEY
 import com.example.id.util.ApiService
 import com.example.id.util.LoginRequest
 import com.example.id.util.LoginResponse
@@ -23,14 +24,14 @@ class AuthRepository @Inject constructor(
     }
 
     fun saveToken(token: String) {
-        prefs.edit().putString("auth_token", token).apply()
+        prefs.edit().putString(AUTH_TOKEN_KEY, token).apply()
     }
 
     fun getToken(): String? {
-        return prefs.getString("auth_token", null)
+        return prefs.getString(AUTH_TOKEN_KEY, null)
     }
 
     fun clearToken() {
-        prefs.edit().remove("auth_token").apply()
+        prefs.edit().remove(AUTH_TOKEN_KEY).apply()
     }
 }
