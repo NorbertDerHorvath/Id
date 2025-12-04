@@ -39,4 +39,7 @@ interface LoadingEventDao {
 
     @Query("DELETE FROM loading_events WHERE id = :id")
     suspend fun deleteLoadingEventById(id: Long)
+
+    @Query("SELECT * FROM loading_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
+    suspend fun getLoadingEventsAfter(userId: String, sevenDaysAgo: Date): List<LoadingEvent>
 }

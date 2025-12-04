@@ -39,4 +39,7 @@ interface RefuelEventDao {
 
     @Query("DELETE FROM refuel_events WHERE id = :id")
     suspend fun deleteRefuelEventById(id: Long)
+
+    @Query("SELECT * FROM refuel_events WHERE userId = :userId AND timestamp >= :sevenDaysAgo ORDER BY timestamp DESC")
+    suspend fun getRefuelEventsAfter(userId: String, sevenDaysAgo: Date): List<RefuelEvent>
 }

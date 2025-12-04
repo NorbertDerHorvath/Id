@@ -17,6 +17,7 @@ import com.example.id.network.ApiService
 import com.example.id.services.SyncWorker
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
+import java.util.Calendar
 import java.util.Date
 import javax.inject.Inject
 
@@ -177,6 +178,34 @@ class AppRepository @Inject constructor(
     }
 
     suspend fun deleteLoadingEventById(id: Long) {
+        loadingEventDao.deleteLoadingEventById(id)
+    }
+
+    // New methods for recent events
+    suspend fun getRecentWorkdayEvents(userId: String): List<WorkdayEvent> {
+        val sevenDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time
+        return workdayEventDao.getWorkdayEventsAfter(userId, sevenDaysAgo)
+    }
+
+    suspend fun getRecentRefuelEvents(userId: String): List<RefuelEvent> {
+        val sevenDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time
+        return refuelEventDao.getRefuelEventsAfter(userId, sevenDaysAgo)
+    }
+
+    suspend fun getRecentLoadingEvents(userId: String): List<LoadingEvent> {
+        val sevenDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -7) }.time
+        return loadingEventDao.getLoadingEventsAfter(userId, sevenDaysAgo)
+    }
+
+    suspend fun deleteWorkdayEvent(id: Long) {
+        workdayEventDao.deleteWorkdayEventById(id)
+    }
+
+    suspend fun deleteRefuelEvent(id: Long) {
+        refuelEventDao.deleteRefuelEventById(id)
+    }
+
+    suspend fun deleteLoadingEvent(id: Long) {
         loadingEventDao.deleteLoadingEventById(id)
     }
 }

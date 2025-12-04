@@ -7,33 +7,29 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
-import android.net.Uri
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.id.R
 import com.example.id.USER_NAME_KEY
 import com.example.id.data.AppRepository
-import com.example.id.data.entities.BreakEvent
-import com.example.id.data.entities.EventType
-import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.repository.AuthRepository
-import com.example.id.services.TrackingService
 import com.example.id.util.ApiService
-import com.example.id.util.DataManager
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.coroutines.resume
@@ -50,9 +46,8 @@ class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
     private val authRepository: AuthRepository,
-    private val apiService: ApiService,
+    private val utilApiService: ApiService,
     private val prefs: SharedPreferences,
-    private val dataManager: DataManager
 ) : ViewModel() {
 
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -60,26 +55,19 @@ class MainViewModel @Inject constructor(
 
     private val userId: String = prefs.getString(USER_NAME_KEY, "unknown_user")!!
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
+    private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
+    val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
 
-    val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val isloadingStarted: StateFlow<Boolean> = repository.getActiveLoadingEvent(userId).map { it != null }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    val isloadingStarted: StateFlow<Boolean> = repository.getActiveLoadingEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
     private val _workDuration = MutableStateFlow(0L)
     val workDuration: StateFlow<Long> = _workDuration.asStateFlow()
     private val _breakDuration = MutableStateFlow(0L)
     val breakDuration: StateFlow<Long> = _breakDuration.asStateFlow()
     private val _overtime = MutableStateFlow(prefs.getLong("cumulative_overtime", 0L))
     val overtime: StateFlow<Long> = _overtime.asStateFlow()
-    private val _summaryText = MutableStateFlow("")
-    val summaryText: StateFlow<String> = _summaryText.asStateFlow()
-    private val _reportResults = MutableStateFlow<List<Any>>(emptyList())
-    val reportResults: StateFlow<List<Any>> = _reportResults.asStateFlow()
-    private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
-    val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
-    private val _editingEvent = MutableStateFlow<Any?>(null)
-    val editingEvent: StateFlow<Any?> = _editingEvent.asStateFlow()
-    private val _measuredBreakDurationForEdit = MutableStateFlow(0L)
-    val measuredBreakDurationForEdit: StateFlow<Long> = _measuredBreakDurationForEdit.asStateFlow()
     private var activeWorkdayEvent: WorkdayEvent? = null
 
     init {
@@ -156,9 +144,17 @@ class MainViewModel @Inject constructor(
                 startOdometer = odometer,
                 endOdometer = null,
                 carPlate = carPlate,
-                type = EventType.WORK
+                type = com.example.id.data.entities.EventType.WORK
             )
             repository.insertWorkdayEvent(newWorkday)
+            try {
+                val response = utilApiService.postWorkday(newWorkday)
+                if (!response.isSuccessful) {
+                    Log.e("MainViewModel", "Failed to send workday: ${response.errorBody()?.string()}")
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Exception when sending workday", e)
+            }
         }
     }
 
@@ -178,9 +174,12 @@ class MainViewModel @Inject constructor(
                 repository.updateWorkdayEvent(updatedWorkday)
 
                 try {
-                    apiService.postWorkday(updatedWorkday)
+                    val response = utilApiService.postWorkday(updatedWorkday)
+                    if (!response.isSuccessful) {
+                        Log.e("MainViewModel", "Failed to send workday end: ${response.errorBody()?.string()}")
+                    }
                 } catch (e: Exception) {
-                    Log.e("MainViewModel", "Failed to send workday", e)
+                    Log.e("MainViewModel", "Exception when sending workday end", e)
                 }
             }
         }
@@ -203,6 +202,52 @@ class MainViewModel @Inject constructor(
                 carPlate = carPlate
             )
             repository.insertRefuelEvent(refuel)
+            try {
+                val response = utilApiService.postRefuel(refuel)
+                if (!response.isSuccessful) {
+                    Log.e("MainViewModel", "Failed to send refuel event: ${response.errorBody()?.string()}")
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Exception when sending refuel event", e)
+            }
+        }
+    }
+
+    fun loadRecentEvents() {
+        viewModelScope.launch {
+            val allEvents = mutableListOf<Any>()
+            allEvents.addAll(repository.getRecentWorkdayEvents(userId))
+            allEvents.addAll(repository.getRecentRefuelEvents(userId))
+            allEvents.addAll(repository.getRecentLoadingEvents(userId))
+            _recentEvents.value = allEvents.sortedByDescending { event ->
+                when (event) {
+                    is WorkdayEvent -> event.startTime
+                    is RefuelEvent -> event.timestamp
+                    is com.example.id.data.entities.LoadingEvent -> event.startTime
+                    else -> Date(0)
+                }
+            }
+        }
+    }
+
+    fun deleteWorkdayEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteWorkdayEvent(id)
+            loadRecentEvents()
+        }
+    }
+
+    fun deleteRefuelEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteRefuelEvent(id)
+            loadRecentEvents()
+        }
+    }
+
+    fun deleteLoadingEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteLoadingEvent(id)
+            loadRecentEvents()
         }
     }
 
@@ -212,25 +257,6 @@ class MainViewModel @Inject constructor(
         val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
-    
-    fun endBreak() {}
-    fun startBreak() {}
-    fun generateSummary(context: Context) {}
-    fun resetOvertime() {}
-    fun recordAbsence(type: String, startDate: Date, endDate: Date) {}
-    fun loadLoadingForEdit(id: Long) {}
-    fun clearEditingEvent() {}
-    fun updateLoading(event: LoadingEvent) {}
-    fun loadRefuelForEdit(id: Long) {}
-    fun updateRefuel(event: RefuelEvent) {}
-    fun loadWorkdayForEdit(id: Long) {}
-    fun updateWorkday(event: WorkdayEvent) {}
-    fun loadRecentEvents() {}
-    fun deleteWorkdayEvent(id: Long) {}
-    fun deleteRefuelEvent(id: Long) {}
-    fun deleteLoadingEvent(id: Long) {}
-    fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {}
-    fun runReport(eventTypeKey: String, startDateString: String, endDateString: String, carPlate: String?, fuelType: String?, paymentMethod: String?) {}
 
     private suspend fun getCurrentLocation(): Location? {
         if (ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

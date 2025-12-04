@@ -42,4 +42,7 @@ interface WorkdayEventDao {
 
     @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'")
     fun getWorkdayEventsByPlate(userId: String, carPlate: String): Flow<List<WorkdayEvent>>
+
+    @Query("SELECT * FROM workday_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
+    suspend fun getWorkdayEventsAfter(userId: String, sevenDaysAgo: Date): List<WorkdayEvent>
 }

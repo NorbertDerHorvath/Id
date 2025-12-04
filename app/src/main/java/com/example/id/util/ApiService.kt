@@ -1,5 +1,6 @@
 package com.example.id.util
 
+import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import retrofit2.Response
 import retrofit2.http.Body
@@ -27,6 +28,9 @@ data class ValidateResponse(
 interface ApiService {
     @POST("api/workday-events")
     suspend fun postWorkday(@Body workday: WorkdayEvent): Response<Void>
+
+    @POST("api/refuel-events")
+    suspend fun postRefuel(@Body refuel: RefuelEvent): Response<Void>
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
