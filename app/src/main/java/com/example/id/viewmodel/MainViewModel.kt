@@ -48,7 +48,6 @@ class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
     private val authRepository: AuthRepository,
-    private val utilApiService: ApiService,
     private val prefs: SharedPreferences,
 ) : ViewModel() {
 
@@ -124,7 +123,7 @@ class MainViewModel @Inject constructor(
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
-                    prefs.edit().putString(USER_NAME_KEY, body.username).apply()
+                    prefs.edit().putString(USER_NAME_KEY, username).apply()
                     updateUserData()
                     _loginState.value = LoginUiState.Success
                 } else {
@@ -194,14 +193,6 @@ class MainViewModel @Inject constructor(
             )
             repository.insertWorkdayEvent(newWorkday)
             updateUserData()
-            try {
-                val response = utilApiService.postWorkday(newWorkday)
-                if (!response.isSuccessful) {
-                    Log.e("MainViewModel", "Failed to send workday: ${response.errorBody()?.string()}")
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Exception when sending workday", e)
-            }
         }
     }
 
@@ -220,15 +211,6 @@ class MainViewModel @Inject constructor(
                 )
                 repository.updateWorkdayEvent(updatedWorkday)
                 updateUserData()
-
-                try {
-                    val response = utilApiService.postWorkday(updatedWorkday)
-                    if (!response.isSuccessful) {
-                        Log.e("MainViewModel", "Failed to send workday end: ${response.errorBody()?.string()}")
-                    }
-                } catch (e: Exception) {
-                    Log.e("MainViewModel", "Exception when sending workday end", e)
-                }
             }
         }
     }
@@ -250,14 +232,6 @@ class MainViewModel @Inject constructor(
                 carPlate = carPlate
             )
             repository.insertRefuelEvent(refuel)
-            try {
-                val response = utilApiService.postRefuel(refuel)
-                if (!response.isSuccessful) {
-                    Log.e("MainViewModel", "Failed to send refuel event: ${response.errorBody()?.string()}")
-                }
-            } catch (e: Exception) {
-                Log.e("MainViewModel", "Exception when sending refuel event", e)
-            }
         }
     }
 
