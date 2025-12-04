@@ -11,8 +11,15 @@ const PORT = process.env.PORT || 8080;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public')); // Serve static files from 'public' directory
 
-// --- Public Routes ---
+// --- HTML Serving ---
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
+
+
+// --- Public API Routes ---
 
 // Helper Route to create/reset the test user for debugging
 app.get('/api/create-test-user', async (req, res) => {
@@ -42,39 +49,7 @@ app.get('/api/create-test-user', async (req, res) => {
   }
 });
 
-// 1. Register a new Company and its Admin user
-app.post('/api/register', async (req, res) => {
-  const { companyName, adminEmail, password } = req.body;
-
-  if (!companyName || !adminEmail || !password) {
-    return res.status(400).json({ error: 'All fields are required.' });
-  }
-
-  const t = await sequelize.transaction();
-
-  try {
-    const company = await Company.create({ name: companyName, adminEmail }, { transaction: t });
-    const adminUser = await User.create({
-      username: adminEmail, // Admin's username is their email
-      password,
-      role: 'admin',
-      companyId: company.id,
-    }, { transaction: t });
-
-    await t.commit();
-    res.status(201).json({ message: 'Company and admin registered successfully.', companyId: company.id });
-
-  } catch (error) {
-    await t.rollback();
-    console.error('Registration error:', error);
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(409).json({ error: 'Company name or email already exists.' });
-    }
-    res.status(500).json({ error: 'Server error during registration.' });
-  }
-});
-
-// 2. Login user
+// Login user
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -99,7 +74,9 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 4. Data submission endpoints
+// --- Data Submission & Retrieval API Routes (Protected) ---
+
+// Workday Events
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
     const event = await WorkdayEvent.create({ ...req.body, userId: req.user.userId });
@@ -110,6 +87,17 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/workday-events', async (req, res) => {
+  try {
+    const events = await WorkdayEvent.findAll({ include: User });
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching workday events:', error);
+    res.status(500).json({ error: 'Failed to fetch workday events.' });
+  }
+});
+
+// Refuel Events
 app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   try {
     const event = await RefuelEvent.create({ ...req.body, userId: req.user.userId });
@@ -120,6 +108,18 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/refuel-events', async (req, res) => {
+  try {
+    const events = await RefuelEvent.findAll({ include: User });
+    res.json(events);
+  } catch (error) {
+    console.error('Error fetching refuel events:', error);
+    res.status(500).json({ error: 'Failed to fetch refuel events.' });
+  }
+});
+
+
+// Loading Events
 app.post('/api/loading-events', authenticateToken, async (req, res) => {
   try {
     const event = await LoadingEvent.create({ ...req.body, userId: req.user.userId });
@@ -130,33 +130,16 @@ app.post('/api/loading-events', authenticateToken, async (req, res) => {
   }
 });
 
-
-// --- Protected Routes (for admin actions) ---
-app.post('/api/users/driver', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Forbidden: Only admins can create drivers.' });
-  }
-
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required for the new driver.' });
-  }
-
+app.get('/api/loading-events', async (req, res) => {
   try {
-    const newDriver = await User.create({
-      username,
-      password,
-      role: 'driver',
-      companyId: req.user.companyId,
-    });
-    res.status(201).json({ message: 'Driver created successfully.', userId: newDriver.id, username: newDriver.username });
+    const events = await LoadingEvent.findAll({ include: User });
+    res.json(events);
   } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(409).json({ error: 'Username already exists.' });
-    }
-    res.status(500).json({ error: 'Server error creating driver.' });
+    console.error('Error fetching loading events:', error);
+    res.status(500).json({ error: 'Failed to fetch loading events.' });
   }
 });
+
 
 // Start server and sync database
 app.listen(PORT, async () => {
