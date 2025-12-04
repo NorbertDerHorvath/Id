@@ -13,6 +13,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.id.USER_NAME_KEY
 import com.example.id.data.AppRepository
+import com.example.id.data.entities.EventType
+import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.repository.AuthRepository
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
+import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -55,9 +58,6 @@ class MainViewModel @Inject constructor(
 
     private val userId: String = prefs.getString(USER_NAME_KEY, "unknown_user")!!
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
-    private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
-    val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
-
 
     val isWorkdayStarted: StateFlow<Boolean> = repository.getActiveWorkdayEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
     val isBreakStarted: StateFlow<Boolean> = repository.getActiveBreakEvent(userId).map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
@@ -68,6 +68,16 @@ class MainViewModel @Inject constructor(
     val breakDuration: StateFlow<Long> = _breakDuration.asStateFlow()
     private val _overtime = MutableStateFlow(prefs.getLong("cumulative_overtime", 0L))
     val overtime: StateFlow<Long> = _overtime.asStateFlow()
+    private val _summaryText = MutableStateFlow("")
+    val summaryText: StateFlow<String> = _summaryText.asStateFlow()
+    private val _reportResults = MutableStateFlow<List<Any>>(emptyList())
+    val reportResults: StateFlow<List<Any>> = _reportResults.asStateFlow()
+    private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
+    val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
+    private val _editingEvent = MutableStateFlow<Any?>(null)
+    val editingEvent: StateFlow<Any?> = _editingEvent.asStateFlow()
+    private val _measuredBreakDurationForEdit = MutableStateFlow(0L)
+    val measuredBreakDurationForEdit: StateFlow<Long> = _measuredBreakDurationForEdit.asStateFlow()
     private var activeWorkdayEvent: WorkdayEvent? = null
 
     init {
@@ -144,7 +154,7 @@ class MainViewModel @Inject constructor(
                 startOdometer = odometer,
                 endOdometer = null,
                 carPlate = carPlate,
-                type = com.example.id.data.entities.EventType.WORK
+                type = EventType.WORK
             )
             repository.insertWorkdayEvent(newWorkday)
             try {
@@ -213,6 +223,25 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun formatDuration(millis: Long): String {
+        val hours = TimeUnit.MILLISECONDS.toHours(millis)
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
+    fun endBreak() {}
+    fun startBreak() {}
+    fun generateSummary(context: Context) {}
+    fun resetOvertime() {}
+    fun recordAbsence(type: String, startDate: Date, endDate: Date) {}
+    fun loadLoadingForEdit(id: Long) {}
+    fun clearEditingEvent() {}
+    fun updateLoading(event: LoadingEvent) {}
+    fun loadRefuelForEdit(id: Long) {}
+    fun updateRefuel(event: RefuelEvent) {}
+    fun loadWorkdayForEdit(id: Long) {}
+    fun updateWorkday(event: WorkdayEvent) {}
     fun loadRecentEvents() {
         viewModelScope.launch {
             val allEvents = mutableListOf<Any>()
@@ -229,7 +258,6 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-
     fun deleteWorkdayEvent(id: Long) {
         viewModelScope.launch {
             repository.deleteWorkdayEvent(id)
@@ -250,13 +278,8 @@ class MainViewModel @Inject constructor(
             loadRecentEvents()
         }
     }
-
-    fun formatDuration(millis: Long): String {
-        val hours = TimeUnit.MILLISECONDS.toHours(millis)
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
-        val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
-    }
+    fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {}
+    fun runReport(eventTypeKey: String, startDateString: String, endDateString: String, carPlate: String?, fuelType: String?, paymentMethod: String?) {}
 
     private suspend fun getCurrentLocation(): Location? {
         if (ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

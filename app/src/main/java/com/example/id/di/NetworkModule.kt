@@ -1,5 +1,6 @@
 package com.example.id.di
 
+import android.content.SharedPreferences
 import com.example.id.network.ApiService as NetworkApiService
 import com.example.id.util.ApiService as UtilApiService
 import com.example.id.util.AuthInterceptor
@@ -25,7 +26,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(loggingInterceptor: HttpLoggingInterceptor, authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideOkHttpClient(loggingInterceptor: HttpLoggingInterceptor, prefs: SharedPreferences): OkHttpClient {
+        val authInterceptor = AuthInterceptor(prefs)
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
             .addInterceptor(authInterceptor)
