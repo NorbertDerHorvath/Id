@@ -14,27 +14,28 @@ app.use(express.json());
 
 // --- Public Routes ---
 
-// Helper Route to create a test user for debugging
+// Helper Route to create/reset the test user for debugging
 app.get('/api/create-test-user', async (req, res) => {
   try {
-    const [user, created] = await User.findOrCreate({
-      where: { username: 'norbi' },
-      defaults: {
-        password: 'norbi', // bcrypt will hash this automatically
-        role: 'driver',
-        companyId: 1 // Assuming a company with ID 1 exists, or adjust as needed
-      }
+    // Destroy the user if it already exists to ensure a clean slate
+    await User.destroy({ where: { username: 'norbi' } });
+
+    // Ensure the default company exists
+    await Company.findOrCreate({
+      where: { id: 1 },
+      defaults: { name: 'Test Company', adminEmail: 'admin@test.com' }
     });
 
-    if (created) {
-      // Also ensure a default company exists for the user
-      await Company.findOrCreate({
-          where: { id: 1 },
-          defaults: { name: 'Test Company', adminEmail: 'admin@test.com' }
-      });
-      return res.status(201).send('Test user created successfully with username: norbi, password: norbi');
-    }
-    return res.status(200).send('Test user already exists.');
+    // Create the new test user
+    const user = await User.create({
+      username: 'norbi',
+      password: 'norbi', // The beforeCreate hook will hash this automatically
+      role: 'driver',
+      companyId: 1
+    });
+
+    return res.status(201).send('Test user (re)created successfully with username: norbi, password: norbi');
+
   } catch (error) {
     console.error('Error creating test user:', error);
     return res.status(500).send('Error creating test user.');
