@@ -22,14 +22,10 @@ import com.example.id.util.ApiService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
@@ -48,7 +44,6 @@ sealed class LoginUiState {
 }
 
 @HiltViewModel
-@OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
@@ -60,13 +55,20 @@ class MainViewModel @Inject constructor(
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState
 
-    private val _userId = MutableStateFlow(prefs.getString(USER_NAME_KEY, "unknown_user") ?: "unknown_user")
+    private val userId: String
+        get() = prefs.getString(USER_NAME_KEY, "unknown_user")!!
 
     private val fusedLocationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(application)
 
-    val isWorkdayStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveWorkdayEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isBreakStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveBreakEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
-    val isloadingStarted: StateFlow<Boolean> = _userId.filter { it != "unknown_user" }.flatMapLatest { id -> repository.getActiveLoadingEvent(id) }.map { it != null }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+    private val _isWorkdayStarted = MutableStateFlow(false)
+    val isWorkdayStarted: StateFlow<Boolean> = _isWorkdayStarted.asStateFlow()
+
+    private val _isBreakStarted = MutableStateFlow(false)
+    val isBreakStarted: StateFlow<Boolean> = _isBreakStarted.asStateFlow()
+
+    private val _isloadingStarted = MutableStateFlow(false)
+    val isloadingStarted: StateFlow<Boolean> = _isloadingStarted.asStateFlow()
+
     private val _workDuration = MutableStateFlow(0L)
     val workDuration: StateFlow<Long> = _workDuration.asStateFlow()
     private val _breakDuration = MutableStateFlow(0L)
@@ -86,11 +88,30 @@ class MainViewModel @Inject constructor(
     private var activeWorkdayEvent: WorkdayEvent? = null
 
     init {
+        if (authRepository.getToken() != null) {
+            validateToken()
+        } else {
+            updateUserData()
+        }
+    }
+    
+    private fun updateUserData() {
         viewModelScope.launch {
-            _userId.filter { it != "unknown_user" }.flatMapLatest { id ->
-                repository.getActiveWorkdayEvent(id)
-            }.collect { event ->
-                activeWorkdayEvent = event
+            val currentUserId = userId
+            if (currentUserId != "unknown_user") {
+                activeWorkdayEvent = repository.getActiveWorkdayEvent(currentUserId).firstOrNull()
+                _isWorkdayStarted.value = activeWorkdayEvent != null
+
+                val activeBreakEvent = repository.getActiveBreakEvent(currentUserId).firstOrNull()
+                _isBreakStarted.value = activeBreakEvent != null
+                
+                val activeLoadingEvent = repository.getActiveLoadingEvent(currentUserId).firstOrNull()
+                _isloadingStarted.value = activeLoadingEvent != null
+            } else {
+                _isWorkdayStarted.value = false
+                _isBreakStarted.value = false
+                _isloadingStarted.value = false
+                activeWorkdayEvent = null
             }
         }
     }
@@ -104,7 +125,7 @@ class MainViewModel @Inject constructor(
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, body.username).apply()
-                    _userId.value = body.username
+                    updateUserData()
                     _loginState.value = LoginUiState.Success
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
@@ -127,7 +148,7 @@ class MainViewModel @Inject constructor(
             try {
                 val response = authRepository.validateToken(token)
                 if (response.isSuccessful && response.body()?.valid == true) {
-                    _userId.value = prefs.getString(USER_NAME_KEY, "unknown_user")!!
+                    updateUserData()
                     _loginState.value = LoginUiState.Success
                 } else {
                     authRepository.clearToken()
@@ -140,10 +161,12 @@ class MainViewModel @Inject constructor(
     }
 
     fun logout() {
-        authRepository.clearToken()
-        prefs.edit().remove(USER_NAME_KEY).apply()
-        _userId.value = "unknown_user"
-        _loginState.value = LoginUiState.Idle
+        viewModelScope.launch {
+            authRepository.clearToken()
+            prefs.edit().remove(USER_NAME_KEY).apply()
+            updateUserData()
+            _loginState.value = LoginUiState.Idle
+        }
     }
 
     fun startWorkday(odometer: Int?, carPlate: String?) {
@@ -151,7 +174,7 @@ class MainViewModel @Inject constructor(
             val location = getCurrentLocation()
             val address = getAddressFromLocation(application, location)
             val newWorkday = WorkdayEvent(
-                userId = _userId.value,
+                userId = userId,
                 role = prefs.getString("user_role", "driver")!!,
                 startTime = Date(),
                 endTime = null,
@@ -170,6 +193,7 @@ class MainViewModel @Inject constructor(
                 type = EventType.WORK
             )
             repository.insertWorkdayEvent(newWorkday)
+            updateUserData()
             try {
                 val response = utilApiService.postWorkday(newWorkday)
                 if (!response.isSuccessful) {
@@ -195,6 +219,7 @@ class MainViewModel @Inject constructor(
                     endLongitude = location?.longitude
                 )
                 repository.updateWorkdayEvent(updatedWorkday)
+                updateUserData()
 
                 try {
                     val response = utilApiService.postWorkday(updatedWorkday)
@@ -213,7 +238,7 @@ class MainViewModel @Inject constructor(
             val location = getCurrentLocation()
             val address = getAddressFromLocation(application, location)
             val refuel = RefuelEvent(
-                userId = _userId.value,
+                userId = userId,
                 timestamp = Date(),
                 odometer = odometer,
                 fuelType = fuelType,
@@ -257,16 +282,16 @@ class MainViewModel @Inject constructor(
     fun updateWorkday(event: WorkdayEvent) {}
     fun loadRecentEvents() {
         viewModelScope.launch {
-            if (_userId.value == "unknown_user") return@launch
+            if (userId == "unknown_user") return@launch
             val allEvents = mutableListOf<Any>()
-            allEvents.addAll(repository.getRecentWorkdayEvents(_userId.value))
-            allEvents.addAll(repository.getRecentRefuelEvents(_userId.value))
-            allEvents.addAll(repository.getRecentLoadingEvents(_userId.value))
+            allEvents.addAll(repository.getRecentWorkdayEvents(userId))
+            allEvents.addAll(repository.getRecentRefuelEvents(userId))
+            allEvents.addAll(repository.getRecentLoadingEvents(userId))
             _recentEvents.value = allEvents.sortedByDescending { event ->
                 when (event) {
                     is WorkdayEvent -> event.startTime
                     is RefuelEvent -> event.timestamp
-                    is com.example.id.data.entities.LoadingEvent -> event.startTime
+                    is LoadingEvent -> event.startTime
                     else -> Date(0)
                 }
             }

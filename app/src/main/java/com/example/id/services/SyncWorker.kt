@@ -11,6 +11,7 @@ import com.example.id.network.ApiService
 import com.google.gson.Gson
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import retrofit2.Response
 
 @HiltWorker
 class SyncWorker @AssistedInject constructor(
@@ -33,7 +34,7 @@ class SyncWorker @AssistedInject constructor(
         val eventJson = inputData.getString(KEY_EVENT_JSON) ?: return Result.failure()
 
         return try {
-            val response = when (eventType) {
+            val response: Response<*> = when (eventType) {
                 TYPE_WORKDAY -> {
                     val event = Gson().fromJson(eventJson, WorkdayEvent::class.java)
                     apiService.uploadWorkdayEvent(event)
@@ -51,6 +52,9 @@ class SyncWorker @AssistedInject constructor(
 
             if (response.isSuccessful) {
                 Result.success()
+            } else if (response.code() == 401) {
+                // Unauthorized, token expired. Don't retry.
+                Result.failure()
             } else {
                 Result.retry()
             }
