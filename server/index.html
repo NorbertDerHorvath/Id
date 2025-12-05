@@ -109,11 +109,16 @@
                 { header: 'Leírás', key: 'description' },
             ];
 
-            // Fetch all data
-            fetchLastLogin();
-            fetchData('workday-events', 'workday-events', workdayColumns);
-            fetchData('refuel-events', 'refuel-events', refuelColumns);
-            fetchData('loading-events', 'loading-events', loadingColumns);
+            const fetchAllData = () => {
+                fetchLastLogin();
+                fetchData('workday-events', 'workday-events', workdayColumns);
+                fetchData('refuel-events', 'refuel-events', refuelColumns);
+                fetchData('loading-events', 'loading-events', loadingColumns);
+            };
+
+            // Fetch all data initially and then every 5 seconds
+            fetchAllData();
+            setInterval(fetchAllData, 5000);
         });
     </script>
 </body>

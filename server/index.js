@@ -105,7 +105,11 @@ app.get('/api/last-login', async (req, res) => {
 // Workday Events
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
-    const event = await WorkdayEvent.create({ ...req.body, userId: req.user.userId });
+    const eventData = req.body;
+    if (!eventData.startTime) {
+        eventData.startTime = new Date();
+    }
+    const event = await WorkdayEvent.create({ ...eventData, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving workday event:', error);

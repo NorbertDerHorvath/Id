@@ -11,6 +11,8 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.id.USER_NAME_KEY
 import com.example.id.data.AppRepository
 import com.example.id.data.entities.EventType
@@ -18,6 +20,7 @@ import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.repository.AuthRepository
+import com.example.id.worker.SyncWorker
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,6 +51,7 @@ class MainViewModel @Inject constructor(
     private val repository: AppRepository,
     private val authRepository: AuthRepository,
     private val prefs: SharedPreferences,
+    private val workManager: WorkManager
 ) : ViewModel() {
 
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -124,6 +128,8 @@ class MainViewModel @Inject constructor(
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, username).apply()
                     updateUserData()
+                    val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+                    workManager.enqueue(syncRequest)
                     _loginState.value = LoginUiState.Success
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
@@ -234,7 +240,32 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    fun fetchData() {}
+    fun fetchData() {
+        viewModelScope.launch {
+            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+            workManager.enqueue(syncRequest)
+
+            if (userId == "unknown_user") return@launch
+
+            val workdayEvents = repository.getAllWorkdayEvents(userId).firstOrNull() ?: emptyList()
+            val refuelEvents = repository.getAllRefuelEvents(userId).firstOrNull() ?: emptyList()
+            val loadingEvents = repository.getAllLoadingEvents(userId).firstOrNull() ?: emptyList()
+
+            val combinedEvents = mutableListOf<Any>()
+            combinedEvents.addAll(workdayEvents)
+            combinedEvents.addAll(refuelEvents)
+            combinedEvents.addAll(loadingEvents)
+
+            _reportResults.value = combinedEvents.sortedByDescending { event ->
+                when (event) {
+                    is WorkdayEvent -> event.startTime
+                    is RefuelEvent -> event.timestamp
+                    is LoadingEvent -> event.startTime
+                    else -> Date(0)
+                }
+            }
+        }
+    }
 
     fun formatDuration(millis: Long): String {
         val hours = TimeUnit.MILLISECONDS.toHours(millis)

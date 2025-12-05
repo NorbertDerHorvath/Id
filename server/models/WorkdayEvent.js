@@ -9,7 +9,7 @@ const WorkdayEvent = sequelize.define('WorkdayEvent', {
   },
   startTime: {
     type: DataTypes.DATE,
-    allowNull: false,
+    allowNull: true,
   },
   endTime: {
     type: DataTypes.DATE,
