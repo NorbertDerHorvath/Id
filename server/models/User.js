@@ -21,6 +21,14 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('admin', 'driver'),
     allowNull: false,
   },
+  lastLoginTime: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  lastLoginLocation: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 // Jelszó titkosítása mentés előtt

@@ -13,12 +13,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from 'public' directory
 
-// In-memory storage for the last login info
-let lastLoginInfo = {
-  time: 'N/A',
-  location: 'N/A'
-};
-
 // --- HTML Serving ---
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -73,10 +67,9 @@ app.post('/api/login', async (req, res) => {
     );
     
     // Update last login info
-    lastLoginInfo = {
-        time: new Date().toLocaleString(),
-        location: req.ip
-    };
+    user.lastLoginTime = new Date();
+    user.lastLoginLocation = req.ip;
+    await user.save();
 
     res.json({ message: 'Login successful', token, username: user.username });
 
@@ -87,8 +80,20 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Get last login info
-app.get('/api/last-login', (req, res) => {
-  res.json(lastLoginInfo);
+app.get('/api/last-login', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      order: [['lastLoginTime', 'DESC']]
+    });
+    if (user) {
+      res.json({ time: user.lastLoginTime, location: user.lastLoginLocation });
+    } else {
+      res.json({ time: 'N/A', location: 'N/A' });
+    }
+  } catch (error) {
+    console.error('Error fetching last login:', error);
+    res.status(500).json({ error: 'Failed to fetch last login.' });
+  }
 });
 
 // --- Data Submission & Retrieval API Routes (Protected) ---
