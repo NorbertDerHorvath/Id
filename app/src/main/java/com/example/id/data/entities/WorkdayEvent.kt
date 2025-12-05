@@ -1,9 +1,11 @@
 package com.example.id.data.entities
 
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
 import com.google.gson.annotations.SerializedName
 import java.util.Date
+import com.example.id.data.entities.User
 
 enum class EventType {
     WORK,
@@ -14,22 +16,26 @@ enum class EventType {
 @Entity(tableName = "workday_events")
 data class WorkdayEvent(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    @SerializedName("user_id") val userId: String, // A felhasználó azonosítója (pl. név)
+    @SerializedName("userId") var userId: String, // A felhasználó azonosítója (pl. név)
     val role: String, // Sofőr vagy Második ember
-    @SerializedName("start_time") val startTime: Date, // WORK esetén a kezdés időpontja
-    @SerializedName("end_time") val endTime: Date?, // WORK esetén a befejezés időpontja
-    @SerializedName("start_date") val startDate: Date?, // VACATION/SICK_LEAVE esetén a kezdő dátum
-    @SerializedName("end_date") val endDate: Date?, // VACATION/SICK_LEAVE esetén a záró dátum
-    @SerializedName("break_time") val breakTime: Int = 0, // Break time in minutes
-    @SerializedName("start_location") val startLocation: String?,
-    @SerializedName("start_latitude") val startLatitude: Double?,
-    @SerializedName("start_longitude") val startLongitude: Double?,
-    @SerializedName("end_location") val endLocation: String?,
-    @SerializedName("end_latitude") val endLatitude: Double?,
-    @SerializedName("end_longitude") val endLongitude: Double?,
-    @SerializedName("start_odometer") val startOdometer: Int?,
-    @SerializedName("end_odometer") val endOdometer: Int?,
-    @SerializedName("car_plate") val carPlate: String?, // Csak sofőr esetén
+    @SerializedName("startTime") val startTime: Date, // WORK esetén a kezdés időpontja
+    @SerializedName("endTime") val endTime: Date?, // WORK esetén a befejezés időpontja
+    @SerializedName("startDate") val startDate: Date?, // VACATION/SICK_LEAVE esetén a kezdő dátum
+    @SerializedName("endDate") val endDate: Date?, // VACATION/SICK_LEAVE esetén a záró dátum
+    @SerializedName("breakTime") val breakTime: Int = 0, // Break time in minutes
+    @SerializedName("startLocation") val startLocation: String?,
+    @SerializedName("startLatitude") val startLatitude: Double?,
+    @SerializedName("startLongitude") val startLongitude: Double?,
+    @SerializedName("endLocation") val endLocation: String?,
+    @SerializedName("endLatitude") val endLatitude: Double?,
+    @SerializedName("endLongitude") val endLongitude: Double?,
+    @SerializedName("startOdometer") val startOdometer: Int?,
+    @SerializedName("endOdometer") val endOdometer: Int?,
+    @SerializedName("carPlate") val carPlate: String?, // Csak sofőr esetén
     val type: EventType = EventType.WORK,
-    val isSynced: Boolean = false
-)
+    var isSynced: Boolean = false
+) {
+    @Ignore
+    @SerializedName("User")
+    val user: User? = null
+}

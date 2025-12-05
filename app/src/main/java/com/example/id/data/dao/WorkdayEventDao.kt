@@ -2,6 +2,7 @@ package com.example.id.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -58,4 +59,10 @@ interface WorkdayEventDao {
         deleteWorkdayEventById(oldId)
         insertWorkdayEvent(newEvent.copy(id = 0))
     }
+
+    @Query("DELETE FROM workday_events WHERE isSynced = 1")
+    suspend fun clearSyncedData()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWorkdayEvents(events: List<WorkdayEvent>)
 }

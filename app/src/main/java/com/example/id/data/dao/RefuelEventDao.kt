@@ -2,6 +2,7 @@ package com.example.id.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -55,4 +56,10 @@ interface RefuelEventDao {
         deleteRefuelEventById(oldId)
         insertRefuelEvent(newEvent.copy(id = 0))
     }
+
+    @Query("DELETE FROM refuel_events WHERE isSynced = 1")
+    suspend fun clearSyncedData()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRefuelEvents(events: List<RefuelEvent>)
 }

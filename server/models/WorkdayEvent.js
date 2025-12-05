@@ -7,6 +7,10 @@ const WorkdayEvent = sequelize.define('WorkdayEvent', {
     primaryKey: true,
     autoIncrement: true, // Matching Android's Long
   },
+  role: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   startTime: {
     type: DataTypes.DATE,
     allowNull: true,

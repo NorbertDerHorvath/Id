@@ -213,4 +213,22 @@ class AppRepository @Inject constructor(
     suspend fun deleteAllData() {
         apiService.deleteAllData()
     }
+
+    suspend fun clearSyncedData() {
+        workdayEventDao.clearSyncedData()
+        refuelEventDao.clearSyncedData()
+        loadingEventDao.clearSyncedData()
+    }
+
+    suspend fun insertWorkdayEvents(events: List<WorkdayEvent>) {
+        workdayEventDao.insertWorkdayEvents(events)
+    }
+
+    suspend fun insertRefuelEvents(events: List<RefuelEvent>) {
+        refuelEventDao.insertRefuelEvents(events)
+    }
+
+    suspend fun insertLoadingEvents(events: List<LoadingEvent>) {
+        loadingEventDao.insertLoadingEvents(events)
+    }
 }

@@ -2,6 +2,7 @@ package com.example.id.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
@@ -55,4 +56,10 @@ interface LoadingEventDao {
         deleteLoadingEventById(oldId)
         insertLoadingEvent(newEvent)
     }
+
+    @Query("DELETE FROM loading_events WHERE isSynced = 1")
+    suspend fun clearSyncedData()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLoadingEvents(events: List<LoadingEvent>)
 }
