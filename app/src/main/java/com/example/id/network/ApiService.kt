@@ -7,6 +7,8 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
 
 // Data classes for Login
 data class LoginRequest(
@@ -31,6 +33,9 @@ data class ValidateResponse(
 interface ApiService {
     @POST("api/workday-events")
     suspend fun postWorkday(@Body workday: WorkdayEvent): Response<Void>
+
+    @PUT("api/workday-events/{id}")
+    suspend fun updateWorkday(@Path("id") id: Long, @Body workday: WorkdayEvent): Response<Void>
 
     @POST("api/refuel-events")
     suspend fun postRefuel(@Body refuel: RefuelEvent): Response<Void>

@@ -29,11 +29,16 @@ class SyncWorker @AssistedInject constructor(
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
-                val response = apiService.postWorkday(event)
+                val response = if (event.endTime != null) {
+                    apiService.updateWorkday(event.id, event)
+                } else {
+                    apiService.postWorkday(event)
+                }
+
                 if (response.isSuccessful) {
                     repository.setWorkdayEventSynced(event.id)
                 } else {
-                    Log.e("SyncWorker", "Workday sync failed: ${response.code()} - ${response.message()}")
+                    Log.e("SyncWorker", "Workday sync failed for event ${event.id}: ${response.code()} - ${response.message()}")
                 }
             }
 

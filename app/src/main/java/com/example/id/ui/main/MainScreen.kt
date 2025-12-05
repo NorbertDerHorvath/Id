@@ -1,58 +1,416 @@
 package com.example.id.ui.main
 
+import android.app.Activity
+import android.content.Context
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.id.data.entities.LoadingEvent
-import com.example.id.data.entities.RefuelEvent
-import com.example.id.data.entities.WorkdayEvent
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import com.example.id.R
 import com.example.id.viewmodel.MainViewModel
 
 @Composable
 fun MainScreen(
-    viewModel: MainViewModel = hiltViewModel()
+    navController: NavController,
+    viewModel: MainViewModel
 ) {
-    val reportResults by viewModel.reportResults.collectAsState()
+    val isWorkdayStarted by viewModel.isWorkdayStarted.collectAsState()
+    val isBreakStarted by viewModel.isBreakStarted.collectAsState()
+    val isloadingStarted by viewModel.isloadingStarted.collectAsState()
+    val workDuration by viewModel.workDuration.collectAsState()
+    val breakDuration by viewModel.breakDuration.collectAsState()
+    val overtime by viewModel.overtime.collectAsState()
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    var showStartOdometerDialog by remember { mutableStateOf(false) }
+    var showEndOdometerDialog by remember { mutableStateOf(false) }
+    var showRefuelDialog by remember { mutableStateOf(false) }
+    var showCarPlateDialog by remember { mutableStateOf(false) }
+    var carPlateForWorkday by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val activity = (LocalContext.current as? Activity)
+
+    if (showCarPlateDialog) {
+        CarPlateConfirmationDialog(
+            defaultCarPlate = "", // TODO: Get from prefs
+            onDismiss = { showCarPlateDialog = false },
+            onConfirm = { carPlate ->
+                carPlateForWorkday = carPlate
+                showCarPlateDialog = false
+                showStartOdometerDialog = true
+            }
+        )
+    }
+
+    if (showStartOdometerDialog) {
+        OdometerDialog(
+            title = stringResource(R.string.start_odometer),
+            onDismiss = { showStartOdometerDialog = false },
+            onConfirm = { odometer ->
+                viewModel.startWorkday(odometer, carPlateForWorkday)
+                showStartOdometerDialog = false
+            }
+        )
+    }
+
+    if (showEndOdometerDialog) {
+        OdometerDialog(
+            title = stringResource(R.string.end_odometer),
+            onDismiss = { showEndOdometerDialog = false },
+            onConfirm = { odometer ->
+                viewModel.endWorkday(odometer)
+                showEndOdometerDialog = false
+            }
+        )
+    }
+
+    if (showRefuelDialog) {
+        RefuelDialog(
+            onDismiss = { showRefuelDialog = false },
+            onConfirm = { odometer, fuelType, fuelAmount, paymentMethod, carPlate ->
+                viewModel.recordRefuel(odometer, fuelType, fuelAmount, paymentMethod, carPlate)
+                showRefuelDialog = false
+            },
+            currentCarPlate = ""
+        )
+    }
+
+    MainScreenLayout(
+        isWorkdayStarted = isWorkdayStarted,
+        isBreakStarted = isBreakStarted,
+        isloadingStarted = isloadingStarted,
+        workDurationText = viewModel.formatDuration(workDuration),
+        breakDurationText = viewModel.formatDuration(breakDuration),
+        overtimeText = viewModel.formatDuration(overtime),
+        onWorkClick = {
+            if (isWorkdayStarted) {
+                showEndOdometerDialog = true
+            } else {
+                showCarPlateDialog = true
+            }
+        },
+        onBreakClick = { if (isBreakStarted) viewModel.endBreak() else viewModel.startBreak() },
+        onRefuelClick = { showRefuelDialog = true },
+        onSummaryClick = {
+            viewModel.generateSummary(context) // Pass context here
+            // navController.navigate("summary") // TODO: Restore summary screen
+        },
+        onManualDataEntryClick = { /* navController.navigate("manual_data_entry") */ },
+        onReportsClick = { navController.navigate("reports") },
+        onLogoutClick = { viewModel.logout() }
+    )
+}
+
+@Composable
+fun MainScreenLayout(
+    isWorkdayStarted: Boolean,
+    isBreakStarted: Boolean,
+    isloadingStarted: Boolean,
+    workDurationText: String,
+    breakDurationText: String,
+    overtimeText: String,
+    onWorkClick: () -> Unit,
+    onBreakClick: () -> Unit,
+    onRefuelClick: () -> Unit,
+    onSummaryClick: () -> Unit,
+    onManualDataEntryClick: () -> Unit,
+    onReportsClick: () -> Unit,
+    onLogoutClick: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) { // Root Box for background
+        Image(
+            painter = painterResource(id = R.drawable.logo),
+            contentDescription = null, // Decorative image
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(0.3f), // HALVÁNYÍTÁS A COMPOSE-BAN
+            contentScale = ContentScale.Crop
+        )
+
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Button(onClick = { viewModel.fetchData() }) {
-                Text("Adatok lekérdezése")
-            }
-            LazyColumn {
-                items(reportResults) { event ->
-                    when (event) {
-                        is WorkdayEvent -> {
-                            Text("Munkanap: ${event.startTime} - ${event.endTime}")
-                        }
-                        is RefuelEvent -> {
-                            Text("Tankolás: ${event.timestamp} - ${event.fuelAmount}L")
-                        }
-                        is LoadingEvent -> {
-                            Text("Rakodás: ${event.startTime} - ${event.location}")
-                        }
-                    }
+            Text(
+                text = stringResource(R.string.net_work_time),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Black
+            )
+            Text(
+                text = workDurationText,
+                fontSize = 48.sp,
+                textAlign = TextAlign.Center,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = stringResource(R.string.total_break_time),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Black
+            )
+            Text(
+                text = breakDurationText,
+                fontSize = 32.sp,
+                textAlign = TextAlign.Center,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "${stringResource(R.string.overtime)}: $overtimeText",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Black
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Row {
+                Button(onClick = onWorkClick) {
+                    Text(if (isWorkdayStarted) stringResource(R.string.end_workday) else stringResource(R.string.start_workday))
                 }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onBreakClick, enabled = isWorkdayStarted) {
+                    Text(if (isBreakStarted) stringResource(R.string.end_break) else stringResource(R.string.start_break))
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row {
+                Button(onClick = onRefuelClick, enabled = isWorkdayStarted) {
+                    Text(stringResource(R.string.record_refuel))
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Button(onClick = onReportsClick) {
+                Text("Jelentések")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onLogoutClick) {
+                Text("Kijelentkezés")
             }
         }
     }
+}
+
+@Composable
+fun CarPlateConfirmationDialog(
+    defaultCarPlate: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (carPlate: String) -> Unit
+) {
+    var carPlate by remember { mutableStateOf(defaultCarPlate ?: "") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.confirm_car_plate)) },
+        text = {
+            OutlinedTextField(
+                value = carPlate,
+                onValueChange = { carPlate = it },
+                label = { Text(stringResource(R.string.car_plate)) },
+                placeholder = { Text("Pl. ABC-123") }
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(carPlate) }) {
+                Text(stringResource(R.string.confirm))
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun OdometerDialog(title: String, onDismiss: () -> Unit, onConfirm: (odometer: Int) -> Unit) {
+    var odometer by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, color = Color.Black) },
+        text = {
+            OutlinedTextField(
+                value = odometer,
+                onValueChange = { odometer = it },
+                label = { Text(stringResource(R.string.odometer), color = Color.Black) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(odometer.toInt()) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RefuelDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) -> Unit,
+    currentCarPlate: String?
+) {
+    val dieselStr = stringResource(R.string.fuel_type_diesel)
+    val adblueStr = stringResource(R.string.fuel_type_adblue)
+    val chipStr = stringResource(R.string.payment_method_chip)
+    val dkvStr = stringResource(R.string.payment_method_dkv)
+    val cashStr = stringResource(R.string.payment_method_cash)
+
+    var odometer by remember { mutableStateOf("") }
+    var fuelType by remember { mutableStateOf(dieselStr) }
+    var fuelAmount by remember { mutableStateOf("") }
+    var paymentMethod by remember { mutableStateOf(chipStr) }
+    var carPlate by remember { mutableStateOf(currentCarPlate ?: "") }
+
+    val fuelTypes = listOf(dieselStr, adblueStr)
+    val paymentMethods = listOf(chipStr, dkvStr, cashStr)
+
+    var fuelTypeExpanded by remember { mutableStateOf(false) }
+    var paymentMethodExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.refuel_details), color = Color.Black) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = odometer,
+                    onValueChange = { odometer = it },
+                    label = { Text(stringResource(R.string.odometer), color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = fuelTypeExpanded,
+                    onExpandedChange = { fuelTypeExpanded = !fuelTypeExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = fuelType,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.fuel_type), color = Color.Black) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fuelTypeExpanded) },
+                        modifier = Modifier.menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = fuelTypeExpanded,
+                        onDismissRequest = { fuelTypeExpanded = false }
+                    ) {
+                        fuelTypes.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption, color = Color.Black) },
+                                onClick = {
+                                    fuelType = selectionOption
+                                    fuelTypeExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = fuelAmount,
+                    onValueChange = { fuelAmount = it },
+                    label = { Text(stringResource(R.string.fuel_amount), color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = paymentMethodExpanded,
+                    onExpandedChange = { paymentMethodExpanded = !paymentMethodExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = paymentMethod,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.payment_method), color = Color.Black) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = paymentMethodExpanded) },
+                        modifier = Modifier.menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = paymentMethodExpanded,
+                        onDismissRequest = { paymentMethodExpanded = false }
+                    ) {
+                        paymentMethods.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption, color = Color.Black) },
+                                onClick = {
+                                    paymentMethod = selectionOption
+                                    paymentMethodExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = carPlate,
+                    onValueChange = { carPlate = it },
+                    label = { Text(stringResource(R.string.car_plate)) }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(odometer.toInt(), fuelType, fuelAmount.toDouble(), paymentMethod, carPlate) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

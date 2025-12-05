@@ -15,6 +15,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.example.id.USER_NAME_KEY
 import com.example.id.data.AppRepository
+import com.example.id.data.entities.BreakEvent
 import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
@@ -24,9 +25,11 @@ import com.example.id.worker.SyncWorker
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -88,27 +91,41 @@ class MainViewModel @Inject constructor(
     private val _measuredBreakDurationForEdit = MutableStateFlow(0L)
     val measuredBreakDurationForEdit: StateFlow<Long> = _measuredBreakDurationForEdit.asStateFlow()
     private var activeWorkdayEvent: WorkdayEvent? = null
+    private var activeBreakEvent: BreakEvent? = null
 
     init {
         if (authRepository.getToken() != null) {
             validateToken()
         } else {
-            updateUserData()
+            _loginState.value = LoginUiState.Idle
         }
     }
-    
+
     private fun updateUserData() {
         viewModelScope.launch {
             val currentUserId = userId
             if (currentUserId != "unknown_user") {
-                activeWorkdayEvent = repository.getActiveWorkdayEvent(currentUserId).firstOrNull()
-                _isWorkdayStarted.value = activeWorkdayEvent != null
-
-                val activeBreakEvent = repository.getActiveBreakEvent(currentUserId).firstOrNull()
-                _isBreakStarted.value = activeBreakEvent != null
-                
+                repository.getActiveWorkdayEvent(currentUserId).collect { event ->
+                    activeWorkdayEvent = event
+                    _isWorkdayStarted.value = event != null && event.endTime == null
+                    if (event == null || event.endTime != null) {
+                        updateDurations()
+                    }
+                }
+                repository.getActiveBreakEvent(currentUserId).collect { event ->
+                    activeBreakEvent = event
+                    _isBreakStarted.value = event != null && event.endTime == null
+                }
                 val activeLoadingEvent = repository.getActiveLoadingEvent(currentUserId).firstOrNull()
                 _isloadingStarted.value = activeLoadingEvent != null
+
+                while (true) {
+                    if (isWorkdayStarted.value) {
+                        updateDurations()
+                    }
+                    delay(1000)
+                }
+
             } else {
                 _isWorkdayStarted.value = false
                 _isBreakStarted.value = false
@@ -128,8 +145,7 @@ class MainViewModel @Inject constructor(
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, username).apply()
                     updateUserData()
-                    val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
-                    workManager.enqueue(syncRequest)
+                    triggerSync()
                     _loginState.value = LoginUiState.Success
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
@@ -173,6 +189,30 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private suspend fun updateDurations() {
+        val currentWorkday = activeWorkdayEvent
+        if (currentWorkday != null) {
+            val workStart = currentWorkday.startTime.time
+            val workEnd = currentWorkday.endTime?.time ?: System.currentTimeMillis()
+            val breaks = repository.getBreaksForWorkday(currentWorkday.id).first()
+            _breakDuration.value = calculateBreakDuration(breaks)
+            _workDuration.value = workEnd - workStart - _breakDuration.value
+        } else {
+            _workDuration.value = 0L
+            _breakDuration.value = 0L
+        }
+    }
+
+    private fun calculateBreakDuration(breaks: List<BreakEvent>, effectiveTime: Long = System.currentTimeMillis()): Long {
+        var totalBreakDuration = 0L
+        breaks.forEach { breakEvent ->
+            val start = breakEvent.startTime.time
+            val end = breakEvent.endTime?.time ?: if (breakEvent.id == activeBreakEvent?.id) effectiveTime else start
+            totalBreakDuration += (end - start)
+        }
+        return totalBreakDuration
+    }
+
     fun startWorkday(odometer: Int?, carPlate: String?) {
         viewModelScope.launch {
             val location = getCurrentLocation()
@@ -194,15 +234,17 @@ class MainViewModel @Inject constructor(
                 startOdometer = odometer,
                 endOdometer = null,
                 carPlate = carPlate,
-                type = EventType.WORK
+                type = EventType.WORK,
+                isSynced = false
             )
             repository.insertWorkdayEvent(newWorkday)
-            updateUserData()
+            updateDurations()
+            triggerSync()
         }
     }
 
     fun endWorkday(odometer: Int?) {
-         viewModelScope.launch {
+        viewModelScope.launch {
             activeWorkdayEvent?.let { workday ->
                 val endTime = Date()
                 val location = getCurrentLocation()
@@ -212,14 +254,53 @@ class MainViewModel @Inject constructor(
                     endOdometer = odometer,
                     endLocation = address,
                     endLatitude = location?.latitude,
-                    endLongitude = location?.longitude
+                    endLongitude = location?.longitude,
+                    isSynced = false
                 )
                 repository.updateWorkdayEvent(updatedWorkday)
-                updateUserData()
+
+                // Overtime calculation
+                val breaks = repository.getBreaksForWorkday(workday.id).first()
+                val totalBreakDuration = calculateBreakDuration(breaks, endTime.time)
+                val netWorkDuration = endTime.time - workday.startTime.time - totalBreakDuration
+                val eightHoursInMillis = 8 * 60 * 60 * 1000L
+                if (netWorkDuration > eightHoursInMillis) {
+                    val dailyOvertime = netWorkDuration - eightHoursInMillis
+                    val currentCumulativeOvertime = prefs.getLong("cumulative_overtime", 0L)
+                    val newCumulativeOvertime = currentCumulativeOvertime + dailyOvertime
+                    prefs.edit().putLong("cumulative_overtime", newCumulativeOvertime).apply()
+                    _overtime.value = newCumulativeOvertime
+                }
+
+                updateDurations()
+                loadRecentEvents()
+                triggerSync()
             }
         }
     }
 
+    fun startBreak() {
+        viewModelScope.launch {
+            activeWorkdayEvent?.let {
+                val breakEvent = BreakEvent(workdayEventId = it.id, startTime = Date(), endTime = null, breakType = null, userId = this@MainViewModel.userId, isSynced = false)
+                repository.insertBreakEvent(breakEvent)
+                updateDurations()
+                triggerSync()
+            }
+        }
+    }
+
+    fun endBreak() {
+        viewModelScope.launch {
+            activeBreakEvent?.let { breakEvent ->
+                val updatedBreak = breakEvent.copy(endTime = Date(), isSynced = false)
+                repository.updateBreakEvent(updatedBreak)
+                updateDurations()
+                triggerSync()
+            }
+        }
+    }
+    
     fun recordRefuel(odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) {
         viewModelScope.launch {
             val location = getCurrentLocation()
@@ -234,17 +315,154 @@ class MainViewModel @Inject constructor(
                 location = address,
                 latitude = location?.latitude,
                 longitude = location?.longitude,
-                carPlate = carPlate
+                carPlate = carPlate,
+                isSynced = false
             )
             repository.insertRefuelEvent(refuel)
+            triggerSync()
         }
+    }
+
+    fun recordAbsence(type: String, startDate: Date, endDate: Date) {
+        viewModelScope.launch {
+            try {
+                val eventType = when (type) {
+                    "VACATION" -> EventType.VACATION
+                    "SICK_LEAVE" -> EventType.SICK_LEAVE
+                    else -> throw IllegalArgumentException("Unknown absence type: $type")
+                }
+
+                val newAbsence = WorkdayEvent(
+                    userId = userId,
+                    role = prefs.getString("user_role", "driver")!!,
+                    startTime = startDate,
+                    endTime = endDate,
+                    startDate = startDate,
+                    endDate = endDate,
+                    breakTime = 0,
+                    startLocation = null,
+                    startLatitude = null,
+                    startLongitude = null,
+                    endLocation = null,
+                    endLatitude = null,
+                    endLongitude = null,
+                    startOdometer = null,
+                    endOdometer = null,
+                    carPlate = null,
+                    type = eventType,
+                    isSynced = false
+                )
+                repository.insertWorkdayEvent(newAbsence)
+                triggerSync()
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error recording absence", e)
+            }
+        }
+    }
+    
+    fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {
+        viewModelScope.launch {
+            val newWorkday = WorkdayEvent(
+                userId = userId,
+                role = prefs.getString("user_role", "driver")!!,
+                startTime = startTime,
+                endTime = endTime,
+                startDate = if (type != EventType.WORK) startTime else null,
+                endDate = if (type != EventType.WORK) endTime else null,
+                breakTime = breakTime,
+                startLocation = startLocation,
+                startLatitude = null,
+                startLongitude = null,
+                endLocation = endLocation,
+                endLatitude = null,
+                endLongitude = null,
+                startOdometer = startOdometer,
+                endOdometer = endOdometer,
+                carPlate = carPlate,
+                type = type,
+                isSynced = false
+            )
+            repository.insertWorkdayEvent(newWorkday)
+            loadRecentEvents()
+            triggerSync()
+        }
+    }
+
+    fun loadWorkdayForEdit(id: Long) {
+        viewModelScope.launch {
+            _editingEvent.value = repository.getWorkdayEventById(id)
+        }
+    }
+
+    fun updateWorkday(event: WorkdayEvent) {
+        viewModelScope.launch {
+            repository.updateWorkdayEvent(event.copy(isSynced = false))
+            clearEditingEvent()
+            loadRecentEvents()
+            triggerSync()
+        }
+    }
+
+    fun loadLoadingForEdit(id: Long) {
+        viewModelScope.launch {
+            _editingEvent.value = repository.getLoadingEventById(id)
+        }
+    }
+
+    fun updateLoading(event: LoadingEvent) {
+        viewModelScope.launch {
+            repository.updateLoadingEvent(event.copy(isSynced = false))
+            clearEditingEvent()
+            loadRecentEvents()
+            triggerSync()
+        }
+    }
+
+    fun loadRefuelForEdit(id: Long) {
+        viewModelScope.launch {
+            _editingEvent.value = repository.getRefuelEventById(id)
+        }
+    }
+
+    fun updateRefuel(event: RefuelEvent) {
+        viewModelScope.launch {
+            repository.updateRefuelEvent(event.copy(isSynced = false))
+            clearEditingEvent()
+            loadRecentEvents()
+            triggerSync()
+        }
+    }
+
+    fun deleteWorkdayEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteWorkdayEvent(id)
+            loadRecentEvents()
+            // TODO: Add deletion sync to server if needed
+        }
+    }
+
+    fun deleteRefuelEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteRefuelEvent(id)
+            loadRecentEvents()
+            // TODO: Add deletion sync to server if needed
+        }
+    }
+
+    fun deleteLoadingEvent(id: Long) {
+        viewModelScope.launch {
+            repository.deleteLoadingEvent(id)
+            loadRecentEvents()
+            // TODO: Add deletion sync to server if needed
+        }
+    }
+
+    fun clearEditingEvent() {
+        _editingEvent.value = null
     }
     
     fun fetchData() {
         viewModelScope.launch {
-            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
-            workManager.enqueue(syncRequest)
-
             if (userId == "unknown_user") return@launch
 
             val workdayEvents = repository.getAllWorkdayEvents(userId).firstOrNull() ?: emptyList()
@@ -267,25 +485,18 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private fun triggerSync() {
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        workManager.enqueue(syncRequest)
+    }
+
     fun formatDuration(millis: Long): String {
         val hours = TimeUnit.MILLISECONDS.toHours(millis)
         val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
         val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
-    
-    fun endBreak() {}
-    fun startBreak() {}
-    fun generateSummary(context: Context) {}
-    fun resetOvertime() {}
-    fun recordAbsence(type: String, startDate: Date, endDate: Date) {}
-    fun loadLoadingForEdit(id: Long) {}
-    fun clearEditingEvent() {}
-    fun updateLoading(event: LoadingEvent) {}
-    fun loadRefuelForEdit(id: Long) {}
-    fun updateRefuel(event: RefuelEvent) {}
-    fun loadWorkdayForEdit(id: Long) {}
-    fun updateWorkday(event: WorkdayEvent) {}
+
     fun loadRecentEvents() {
         viewModelScope.launch {
             if (userId == "unknown_user") return@launch
@@ -303,28 +514,8 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    fun deleteWorkdayEvent(id: Long) {
-        viewModelScope.launch {
-            repository.deleteWorkdayEvent(id)
-            loadRecentEvents()
-        }
-    }
-
-    fun deleteRefuelEvent(id: Long) {
-        viewModelScope.launch {
-            repository.deleteRefuelEvent(id)
-            loadRecentEvents()
-        }
-    }
-
-    fun deleteLoadingEvent(id: Long) {
-        viewModelScope.launch {
-            repository.deleteLoadingEvent(id)
-            loadRecentEvents()
-        }
-    }
-    fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {}
-    fun runReport(eventTypeKey: String, startDateString: String, endDateString: String, carPlate: String?, fuelType: String?, paymentMethod: String?) {}
+    
+    fun generateSummary(context: Context) {}
 
     private suspend fun getCurrentLocation(): Location? {
         if (ContextCompat.checkSelfPermission(application, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

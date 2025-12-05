@@ -11,5 +11,6 @@ data class BreakEvent(
     val workdayEventId: Long, // Hivatkozás a munkaidő eseményre
     val startTime: Date,
     val endTime: Date?,
-    val breakType: String? // Pl. "Szünet", "Lerakó", "Egyéb"
+    val breakType: String?, // Pl. "Szünet", "Lerakó", "Egyéb"
+    val isSynced: Boolean = false
 )
