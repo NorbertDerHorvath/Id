@@ -10,6 +10,7 @@ import com.example.id.repository.AuthRepository
 import com.example.id.util.AuthInterceptor
 import com.example.id.util.DataManager
 import com.example.id.util.LocationProvider
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -71,10 +72,14 @@ object AppModule {
     @Provides
     @Singleton
     fun provideApiService(okHttpClient: OkHttpClient): ApiService {
+        val gson = GsonBuilder()
+            .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+            .create()
+            
         return Retrofit.Builder()
-            .baseUrl("http://10.0.2.2:8080/") // Standard emulator localhost URL
+            .baseUrl("https://bok-server.onrender.com/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
             .create(ApiService::class.java)
     }
