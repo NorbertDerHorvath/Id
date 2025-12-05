@@ -12,9 +12,14 @@ import com.example.id.data.dao.LoadingEventDao
 import com.example.id.data.dao.RefuelEventDao
 import com.example.id.data.dao.WorkdayEventDao
 import com.example.id.data.entities.BreakEvent
+import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.Date
 
 @Database(
     entities = [WorkdayEvent::class, BreakEvent::class, RefuelEvent::class, LoadingEvent::class],
@@ -39,6 +44,36 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tfm-database"
                 )
+                .addCallback(object : RoomDatabase.Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        super.onCreate(db)
+                        // Insert sample data
+                        CoroutineScope(Dispatchers.IO).launch {
+                            INSTANCE?.workdayEventDao()?.insertWorkdayEvent(
+                                WorkdayEvent(
+                                    userId = "norbi",
+                                    role = "driver",
+                                    startTime = Date(System.currentTimeMillis() - 3600000), // 1 hour ago
+                                    endTime = Date(),
+                                    startDate = null,
+                                    endDate = null,
+                                    breakTime = 0,
+                                    startLocation = "Sample Start Location",
+                                    startLatitude = 47.4979,
+                                    startLongitude = 19.0402,
+                                    endLocation = "Sample End Location",
+                                    endLatitude = 47.4979,
+                                    endLongitude = 19.0402,
+                                    startOdometer = 12345,
+                                    endOdometer = 12355,
+                                    carPlate = "ABC-123",
+                                    type = EventType.WORK,
+                                    isSynced = false
+                                )
+                            )
+                        }
+                    }
+                })
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7) // Hozzáadva a MIGRATION_6_7
                 .build()
                 INSTANCE = instance

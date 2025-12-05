@@ -79,6 +79,10 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/validate-token', authenticateToken, (req, res) => {
+    res.json({ valid: true });
+});
+
 // Get last login info
 app.get('/api/last-login', async (req, res) => {
   try {

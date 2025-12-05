@@ -233,6 +233,8 @@ class MainViewModel @Inject constructor(
             repository.insertRefuelEvent(refuel)
         }
     }
+    
+    fun fetchData() {}
 
     fun formatDuration(millis: Long): String {
         val hours = TimeUnit.MILLISECONDS.toHours(millis)
