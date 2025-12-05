@@ -18,7 +18,6 @@ import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.repository.AuthRepository
-import com.example.id.util.ApiService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -145,7 +144,7 @@ class MainViewModel @Inject constructor(
             }
 
             try {
-                val response = authRepository.validateToken(token)
+                val response = authRepository.validateToken()
                 if (response.isSuccessful && response.body()?.valid == true) {
                     updateUserData()
                     _loginState.value = LoginUiState.Success

@@ -145,6 +145,9 @@
     <string name="liter_unit">L</string>
     <string name="login">Anmelden</string>
     <string name="logout">Abmelden</string>
+    <string name="car_plate_label">Kennzeichen:</string>
+    <string name="start_odometer_label">Anfangskilometerstand:</string>
+    <string name="end_odometer_label">Endkilometerstand:</string>
     <plurals name="days_plural">
         <item quantity="one">%d Tag</item>
         <item quantity="other">%d Tage</item>

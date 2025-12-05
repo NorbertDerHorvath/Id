@@ -4,6 +4,7 @@ import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 // Data classes for Login
@@ -36,6 +37,6 @@ interface ApiService {
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    @POST("api/validate-token")
-    suspend fun validateToken(@Body request: ValidateRequest): Response<ValidateResponse>
+    @GET("api/validate-token")
+    suspend fun validateToken(): Response<ValidateResponse>
 }

@@ -102,6 +102,9 @@ fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel
                 EventType.WORK -> {
                     Text("${stringResource(R.string.start_time_label)} ${dateTimeFormat.format(event.startTime)}")
                     event.endTime?.let { Text("${stringResource(R.string.end_time_label)} ${dateTimeFormat.format(it)}") }
+                    Text("${stringResource(R.string.car_plate_label)} ${event.carPlate}")
+                    Text("${stringResource(R.string.start_odometer_label)} ${event.startOdometer}")
+                    event.endOdometer?.let { Text("${stringResource(R.string.end_odometer_label)} $it") }
                     if (event.breakTime > 0) {
                         Text("${stringResource(R.string.break_time_label)} ${event.breakTime} ${stringResource(R.string.break_time_unit)}")
                     }
