@@ -110,7 +110,8 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
         eventData.startTime = new Date();
     }
     const event = await WorkdayEvent.create({ ...eventData, userId: req.user.userId });
-    res.status(201).json(event);
+    const newEvent = await WorkdayEvent.findByPk(event.id, { include: User });
+    res.status(201).json(newEvent);
   } catch (error) {
     console.error('Error saving workday event:', error);
     res.status(500).json({ error: 'Failed to save workday event.' });
@@ -132,7 +133,8 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   try {
     const { id, ...eventData } = req.body; // Destructure to remove id
     const event = await RefuelEvent.create({ ...eventData, userId: req.user.userId });
-    res.status(201).json(event);
+    const newEvent = await RefuelEvent.findByPk(event.id, { include: User });
+    res.status(201).json(newEvent);
   } catch (error) {
     console.error('Error saving refuel event:', error);
     res.status(500).json({ error: 'Failed to save refuel event.' });
@@ -155,7 +157,8 @@ app.post('/api/loading-events', authenticateToken, async (req, res) => {
   try {
     const { id, ...eventData } = req.body; // Destructure to remove id
     const event = await LoadingEvent.create({ ...eventData, userId: req.user.userId });
-    res.status(201).json(event);
+    const newEvent = await LoadingEvent.findByPk(event.id, { include: User });
+    res.status(201).json(newEvent);
   } catch (error) {
     console.error('Error saving loading event:', error);
     res.status(500).json({ error: 'Failed to save loading event.' });
