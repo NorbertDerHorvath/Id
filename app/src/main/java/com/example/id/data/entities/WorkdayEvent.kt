@@ -17,7 +17,7 @@ enum class EventType {
 data class WorkdayEvent(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @SerializedName("userId") var userId: String, // A felhasználó azonosítója (pl. név)
-    val role: String, // Sofőr vagy Második ember
+    val role: String?, // Sofőr vagy Második ember
     @SerializedName("startTime") val startTime: Date, // WORK esetén a kezdés időpontja
     @SerializedName("endTime") val endTime: Date?, // WORK esetén a befejezés időpontja
     @SerializedName("startDate") val startDate: Date?, // VACATION/SICK_LEAVE esetén a kezdő dátum
