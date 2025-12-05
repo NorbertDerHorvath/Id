@@ -2,11 +2,10 @@ package com.example.id.di
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.room.Room
 import androidx.work.WorkManager
 import com.example.id.data.AppDatabase
 import com.example.id.data.AppRepository
-import com.example.id.network.ApiService as NetworkApiService
+import com.example.id.network.ApiService
 import com.example.id.util.DataManager
 import com.example.id.util.LocationProvider
 import dagger.Module
@@ -23,17 +22,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "id-database"
-        ).build()
+        return AppDatabase.getDatabase(context)
     }
 
     @Provides
     @Singleton
-    fun provideRepository(database: AppDatabase, apiService: NetworkApiService, workManager: WorkManager): AppRepository {
-        return AppRepository(database, apiService, workManager)
+    fun provideRepository(database: AppDatabase, apiService: ApiService): AppRepository {
+        return AppRepository(database, apiService)
     }
 
     @Provides

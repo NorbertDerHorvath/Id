@@ -1,8 +1,7 @@
 package com.example.id.di
 
 import android.content.SharedPreferences
-import com.example.id.network.ApiService as NetworkApiService
-import com.example.id.util.ApiService as UtilApiService
+import com.example.id.network.ApiService
 import com.example.id.util.AuthInterceptor
 import com.google.gson.GsonBuilder
 import dagger.Module
@@ -52,13 +51,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideApiService(retrofit: Retrofit): NetworkApiService {
-        return retrofit.create(NetworkApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
-    fun provideUtilApiService(retrofit: Retrofit): UtilApiService {
-        return retrofit.create(UtilApiService::class.java)
+    fun provideApiService(retrofit: Retrofit): ApiService {
+        return retrofit.create(ApiService::class.java)
     }
 }

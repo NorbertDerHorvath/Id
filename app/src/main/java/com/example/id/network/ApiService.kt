@@ -5,15 +5,42 @@ import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
+
+// Data classes for Login
+data class LoginRequest(
+    val username: String,
+    val password: String
+)
+
+data class LoginResponse(
+    val token: String,
+    val message: String,
+    val username: String
+)
+
+data class ValidateRequest(
+    val token: String
+)
+
+data class ValidateResponse(
+    val valid: Boolean
+)
 
 interface ApiService {
     @POST("api/workday-events")
-    suspend fun uploadWorkdayEvent(@Body workdayEvent: WorkdayEvent): Response<WorkdayEvent>
-
-    @POST("api/loading-events")
-    suspend fun uploadLoadingEvent(@Body loadingEvent: LoadingEvent): Response<LoadingEvent>
+    suspend fun postWorkday(@Body workday: WorkdayEvent): Response<Void>
 
     @POST("api/refuel-events")
-    suspend fun uploadRefuelEvent(@Body refuelEvent: RefuelEvent): Response<RefuelEvent>
+    suspend fun postRefuel(@Body refuel: RefuelEvent): Response<Void>
+
+    @POST("api/loading-events")
+    suspend fun postLoading(@Body loading: LoadingEvent): Response<Void>
+
+    @POST("api/login")
+    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+
+    @GET("api/validate-token")
+    suspend fun validateToken(): Response<ValidateResponse>
 }

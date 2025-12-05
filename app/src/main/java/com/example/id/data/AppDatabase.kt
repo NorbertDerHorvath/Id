@@ -18,7 +18,7 @@ import com.example.id.data.entities.WorkdayEvent
 
 @Database(
     entities = [WorkdayEvent::class, BreakEvent::class, RefuelEvent::class, LoadingEvent::class],
-    version = 6, // Verziószám növelve 6-ra
+    version = 7, // Verziószám növelve 7-re
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -39,7 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tfm-database"
                 )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6) // Hozzáadva a MIGRATION_5_6
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7) // Hozzáadva a MIGRATION_6_7
                 .build()
                 INSTANCE = instance
                 instance
@@ -93,5 +93,14 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE refuel_events ADD COLUMN latitude REAL")
         db.execSQL("ALTER TABLE refuel_events ADD COLUMN longitude REAL")
         db.execSQL("ALTER TABLE refuel_events ADD COLUMN location TEXT")
+    }
+}
+
+// Migráció 6-ról 7-re: Hozzáadja az isSynced oszlopot
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE workday_events ADD COLUMN isSynced INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE refuel_events ADD COLUMN isSynced INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE loading_events ADD COLUMN isSynced INTEGER NOT NULL DEFAULT 0")
     }
 }

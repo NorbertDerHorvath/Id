@@ -40,9 +40,15 @@ interface WorkdayEventDao {
     @Query("DELETE FROM workday_events WHERE id = :id")
     suspend fun deleteWorkdayEventById(id: Long)
 
-    @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'")
+    @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'" )
     fun getWorkdayEventsByPlate(userId: String, carPlate: String): Flow<List<WorkdayEvent>>
 
     @Query("SELECT * FROM workday_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
     suspend fun getWorkdayEventsAfter(userId: String, sevenDaysAgo: Date): List<WorkdayEvent>
+
+    @Query("SELECT * FROM workday_events WHERE isSynced = 0")
+    suspend fun getUnsyncedWorkdayEvents(): List<WorkdayEvent>
+
+    @Query("UPDATE workday_events SET isSynced = 1 WHERE id = :id")
+    suspend fun setWorkdayEventSynced(id: Long)
 }

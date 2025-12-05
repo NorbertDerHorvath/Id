@@ -1,10 +1,5 @@
 package com.example.id.data
 
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import com.example.id.data.dao.BreakEventDao
 import com.example.id.data.dao.LoadingEventDao
 import com.example.id.data.dao.RefuelEventDao
@@ -14,8 +9,6 @@ import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.network.ApiService
-import com.example.id.services.SyncWorker
-import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 import java.util.Date
@@ -23,8 +16,7 @@ import javax.inject.Inject
 
 class AppRepository @Inject constructor(
     private val database: AppDatabase,
-    private val apiService: ApiService,
-    private val workManager: WorkManager
+    private val apiService: ApiService
 ) {
 
     private val workdayEventDao = database.workdayEventDao()
@@ -34,57 +26,29 @@ class AppRepository @Inject constructor(
 
     // Workday Events
     suspend fun insertWorkdayEvent(event: WorkdayEvent): Long {
-        val localId = workdayEventDao.insertWorkdayEvent(event)
-        scheduleSync(SyncWorker.TYPE_WORKDAY, event.copy(id = localId))
-        return localId
+        return workdayEventDao.insertWorkdayEvent(event)
     }
 
     suspend fun updateWorkdayEvent(event: WorkdayEvent) {
         workdayEventDao.updateWorkdayEvent(event)
-        scheduleSync(SyncWorker.TYPE_WORKDAY, event)
     }
 
     // Refuel Events
     suspend fun insertRefuelEvent(event: RefuelEvent): Long {
-        val localId = refuelEventDao.insertRefuelEvent(event)
-        scheduleSync(SyncWorker.TYPE_REFUEL, event.copy(id = localId))
-        return localId
+        return refuelEventDao.insertRefuelEvent(event)
     }
 
     suspend fun updateRefuelEvent(event: RefuelEvent) {
         refuelEventDao.updateRefuelEvent(event)
-        scheduleSync(SyncWorker.TYPE_REFUEL, event)
     }
 
     // Loading Events
     suspend fun insertLoadingEvent(event: LoadingEvent): Long {
-        val localId = loadingEventDao.insertLoadingEvent(event)
-        scheduleSync(SyncWorker.TYPE_LOADING, event.copy(id = localId))
-        return localId
+        return loadingEventDao.insertLoadingEvent(event)
     }
 
     suspend fun updateLoadingEvent(event: LoadingEvent) {
         loadingEventDao.updateLoadingEvent(event)
-        scheduleSync(SyncWorker.TYPE_LOADING, event)
-    }
-
-    private fun scheduleSync(eventType: String, event: Any) {
-        val eventJson = Gson().toJson(event)
-        val workData = Data.Builder()
-            .putString(SyncWorker.KEY_EVENT_TYPE, eventType)
-            .putString(SyncWorker.KEY_EVENT_JSON, eventJson)
-            .build()
-
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-
-        val syncWorkRequest = OneTimeWorkRequestBuilder<SyncWorker>()
-            .setInputData(workData)
-            .setConstraints(constraints)
-            .build()
-
-        workManager.enqueue(syncWorkRequest)
     }
 
     // --- The rest of the repository remains the same ---
@@ -207,5 +171,30 @@ class AppRepository @Inject constructor(
 
     suspend fun deleteLoadingEvent(id: Long) {
         loadingEventDao.deleteLoadingEventById(id)
+    }
+
+    // Methods for SyncWorker
+    suspend fun getUnsyncedWorkdayEvents(): List<WorkdayEvent> {
+        return workdayEventDao.getUnsyncedWorkdayEvents()
+    }
+
+    suspend fun setWorkdayEventSynced(id: Long) {
+        workdayEventDao.setWorkdayEventSynced(id)
+    }
+
+    suspend fun getUnsyncedRefuelEvents(): List<RefuelEvent> {
+        return refuelEventDao.getUnsyncedRefuelEvents()
+    }
+
+    suspend fun setRefuelEventSynced(id: Long) {
+        refuelEventDao.setRefuelEventSynced(id)
+    }
+
+    suspend fun getUnsyncedLoadingEvents(): List<LoadingEvent> {
+        return loadingEventDao.getUnsyncedLoadingEvents()
+    }
+
+    suspend fun setLoadingEventSynced(id: Long) {
+        loadingEventDao.setLoadingEventSynced(id)
     }
 }

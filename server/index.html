@@ -16,6 +16,9 @@
 <body>
     <h1>Szerver Adatbázis Tartalma</h1>
 
+    <h2>Utolsó bejelentkezés</h2>
+    <div id="last-login">Betöltés...</div>
+
     <h2>Munkanapok (Workday Events)</h2>
     <div id="workday-events">Betöltés...</div>
 
@@ -65,6 +68,21 @@
                 }
             };
 
+            const fetchLastLogin = async () => {
+                const targetElement = document.getElementById('last-login');
+                try {
+                    const response = await fetch('/api/last-login');
+                    if (!response.ok) {
+                        throw new Error(`Network response was not ok: ${response.statusText}`);
+                    }
+                    const data = await response.json();
+                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${data.time || 'N/A'}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
+                } catch (error) {
+                    targetElement.innerHTML = `<p style="color: red;">Hiba a betöltés közben: ${error.message}</p>`;
+                    console.error('Fetch error:', error);
+                }
+            };
+
             // Define columns for each table
             const workdayColumns = [
                 { header: 'Felhasználó', key: 'User.username' },
@@ -92,6 +110,7 @@
             ];
 
             // Fetch all data
+            fetchLastLogin();
             fetchData('workday-events', 'workday-events', workdayColumns);
             fetchData('refuel-events', 'refuel-events', refuelColumns);
             fetchData('loading-events', 'loading-events', loadingColumns);

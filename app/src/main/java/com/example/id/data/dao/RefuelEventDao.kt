@@ -42,4 +42,10 @@ interface RefuelEventDao {
 
     @Query("SELECT * FROM refuel_events WHERE userId = :userId AND timestamp >= :sevenDaysAgo ORDER BY timestamp DESC")
     suspend fun getRefuelEventsAfter(userId: String, sevenDaysAgo: Date): List<RefuelEvent>
+
+    @Query("SELECT * FROM refuel_events WHERE isSynced = 0")
+    suspend fun getUnsyncedRefuelEvents(): List<RefuelEvent>
+
+    @Query("UPDATE refuel_events SET isSynced = 1 WHERE id = :id")
+    suspend fun setRefuelEventSynced(id: Long)
 }

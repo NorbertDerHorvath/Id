@@ -13,6 +13,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from 'public' directory
 
+// In-memory storage for the last login info
+let lastLoginInfo = {
+  time: 'N/A',
+  location: 'N/A'
+};
+
 // --- HTML Serving ---
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/index.html');
@@ -65,6 +71,12 @@ app.post('/api/login', async (req, res) => {
       process.env.JWT_SECRET || 'a_very_secret_key_that_should_be_in_env',
       { expiresIn: '30d' } // Token expires in 30 days
     );
+    
+    // Update last login info
+    lastLoginInfo = {
+        time: new Date().toLocaleString(),
+        location: req.ip
+    };
 
     res.json({ message: 'Login successful', token, username: user.username });
 
@@ -72,6 +84,11 @@ app.post('/api/login', async (req, res) => {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login.' });
   }
+});
+
+// Get last login info
+app.get('/api/last-login', (req, res) => {
+  res.json(lastLoginInfo);
 });
 
 // --- Data Submission & Retrieval API Routes (Protected) ---

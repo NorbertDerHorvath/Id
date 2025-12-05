@@ -16,5 +16,6 @@ data class RefuelEvent(
     val timestamp: Date,
     val latitude: Double? = null,
     val longitude: Double? = null,
-    val location: String? = null
+    val location: String? = null,
+    val isSynced: Boolean = false
 )

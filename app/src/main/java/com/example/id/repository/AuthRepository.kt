@@ -2,10 +2,10 @@ package com.example.id.repository
 
 import android.content.SharedPreferences
 import com.example.id.AUTH_TOKEN_KEY
-import com.example.id.util.ApiService
-import com.example.id.util.LoginRequest
-import com.example.id.util.LoginResponse
-import com.example.id.util.ValidateResponse
+import com.example.id.network.ApiService
+import com.example.id.network.LoginRequest
+import com.example.id.network.LoginResponse
+import com.example.id.network.ValidateResponse
 import retrofit2.Response
 import javax.inject.Inject
 

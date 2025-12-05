@@ -13,5 +13,6 @@ data class LoadingEvent(
     val location: String?,
     val latitude: Double?,
     val longitude: Double?,
-    val workdayEventId: Long? // Hivatkozás a munkaidő eseményre
+    val workdayEventId: Long?, // Hivatkozás a munkaidő eseményre
+    val isSynced: Boolean = false
 )

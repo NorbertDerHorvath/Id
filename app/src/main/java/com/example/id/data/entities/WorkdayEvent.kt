@@ -30,5 +30,6 @@ data class WorkdayEvent(
     @SerializedName("start_odometer") val startOdometer: Int?,
     @SerializedName("end_odometer") val endOdometer: Int?,
     @SerializedName("car_plate") val carPlate: String?, // Csak sofőr esetén
-    val type: EventType = EventType.WORK
+    val type: EventType = EventType.WORK,
+    val isSynced: Boolean = false
 )
