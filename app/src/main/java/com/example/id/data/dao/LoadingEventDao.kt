@@ -3,6 +3,7 @@ package com.example.id.data.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.id.data.entities.LoadingEvent
 import kotlinx.coroutines.flow.Flow
@@ -48,4 +49,10 @@ interface LoadingEventDao {
 
     @Query("UPDATE loading_events SET isSynced = 1 WHERE id = :id")
     suspend fun setLoadingEventSynced(id: Long)
+
+    @Transaction
+    suspend fun replaceLoadingEvent(oldId: Long, newEvent: LoadingEvent) {
+        deleteLoadingEventById(oldId)
+        insertLoadingEvent(newEvent)
+    }
 }

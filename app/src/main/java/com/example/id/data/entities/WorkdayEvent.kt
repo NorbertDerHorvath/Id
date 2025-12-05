@@ -13,7 +13,7 @@ enum class EventType {
 
 @Entity(tableName = "workday_events")
 data class WorkdayEvent(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @SerializedName("user_id") val userId: String, // A felhasználó azonosítója (pl. név)
     val role: String, // Sofőr vagy Második ember
     @SerializedName("start_time") val startTime: Date, // WORK esetén a kezdés időpontja

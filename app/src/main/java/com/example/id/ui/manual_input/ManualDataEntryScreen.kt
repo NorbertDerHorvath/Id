@@ -115,10 +115,10 @@ fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_workday/${event.id}") }) {
+                TextButton(onClick = { navController.navigate("edit_workday/${event.id!!}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteWorkdayEvent(event.id) }) {
+                TextButton(onClick = { viewModel.deleteWorkdayEvent(event.id!!) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }
@@ -135,10 +135,10 @@ fun RefuelItemCard(navController: NavController, event: RefuelEvent, viewModel: 
             Text("${stringResource(R.string.date_time_label)} ${dateFormat.format(event.timestamp)}")
             Text("${event.fuelAmount}L ${event.fuelType} - ${event.carPlate}")
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_refuel/${event.id}") }) {
+                TextButton(onClick = { navController.navigate("edit_refuel/${event.id!!}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteRefuelEvent(event.id) }) {
+                TextButton(onClick = { viewModel.deleteRefuelEvent(event.id!!) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }
@@ -155,10 +155,10 @@ fun LoadingItemCard(navController: NavController, event: LoadingEvent, viewModel
             event.startTime?.let { Text("${stringResource(R.string.start_time_label)} ${dateFormat.format(it)}") }
             event.endTime?.let { Text("${stringResource(R.string.end_time_label)} ${dateFormat.format(it)}") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_loading/${event.id}") }) {
+                TextButton(onClick = { navController.navigate("edit_loading/${event.id!!}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteLoadingEvent(event.id) }) {
+                TextButton(onClick = { viewModel.deleteLoadingEvent(event.id!!) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }

@@ -23,4 +23,10 @@ interface BreakEventDao {
 
     @Query("SELECT * FROM break_events WHERE userId = :userId AND endTime IS NULL ORDER BY startTime DESC LIMIT 1")
     fun getActiveBreakEvent(userId: String): Flow<BreakEvent?>
+
+    @Query("SELECT * FROM break_events WHERE isSynced = 0")
+    suspend fun getUnsyncedBreakEvents(): List<BreakEvent>
+
+    @Query("UPDATE break_events SET isSynced = 1 WHERE id = :id")
+    suspend fun setBreakEventSynced(id: Long)
 }

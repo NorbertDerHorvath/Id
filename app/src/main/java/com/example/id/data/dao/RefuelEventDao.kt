@@ -3,6 +3,7 @@ package com.example.id.data.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.id.data.entities.RefuelEvent
 import kotlinx.coroutines.flow.Flow
@@ -48,4 +49,10 @@ interface RefuelEventDao {
 
     @Query("UPDATE refuel_events SET isSynced = 1 WHERE id = :id")
     suspend fun setRefuelEventSynced(id: Long)
+
+    @Transaction
+    suspend fun replaceRefuelEvent(oldId: Long, newEvent: RefuelEvent) {
+        deleteRefuelEventById(oldId)
+        insertRefuelEvent(newEvent.copy(id = 0))
+    }
 }

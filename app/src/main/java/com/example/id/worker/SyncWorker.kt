@@ -23,44 +23,60 @@ class SyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         val token = prefs.getString(AUTH_TOKEN_KEY, null)
-        Log.d("SyncWorker", "Token: $token")
+        if (token == null) {
+            Log.d("SyncWorker", "Token is null, aborting sync.")
+            return Result.failure() // No token, no sync
+        }
 
         return try {
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
-                val response = if (event.endTime != null) {
+                val localId = event.id
+
+                val response = if (event.isSynced) { // Should not happen, but as a safeguard
                     apiService.updateWorkday(event.id, event)
                 } else {
-                    apiService.postWorkday(event)
+                    apiService.postWorkday(event.copy(id = 0))
                 }
 
-                if (response.isSuccessful) {
-                    repository.setWorkdayEventSynced(event.id)
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(
+                        isSynced = true
+                    )
+                    repository.replaceWorkdayEvent(localId, syncedEvent)
                 } else {
-                    Log.e("SyncWorker", "Workday sync failed for event ${event.id}: ${response.code()} - ${response.message()}")
+                    Log.e("SyncWorker", "Workday sync failed for event $localId: ${response.code()} - ${response.message()}")
                 }
             }
 
             // Refuel events
             val unsyncedRefuelEvents = repository.getUnsyncedRefuelEvents()
             unsyncedRefuelEvents.forEach { event ->
-                val response = apiService.postRefuel(event)
-                if (response.isSuccessful) {
-                    repository.setRefuelEventSynced(event.id)
+                val localId = event.id
+                val response = apiService.postRefuel(event.copy(id = 0))
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(
+                        isSynced = true
+                    )
+                    repository.replaceRefuelEvent(localId, syncedEvent)
                 } else {
-                    Log.e("SyncWorker", "Refuel sync failed: ${response.code()} - ${response.message()}")
+                    Log.e("SyncWorker", "Refuel sync failed for event $localId: ${response.code()} - ${response.message()}")
                 }
             }
 
             // Loading events
             val unsyncedLoadingEvents = repository.getUnsyncedLoadingEvents()
             unsyncedLoadingEvents.forEach { event ->
-                val response = apiService.postLoading(event)
-                if (response.isSuccessful) {
-                    repository.setLoadingEventSynced(event.id)
+                val localId = event.id
+                val response = apiService.postLoading(event.copy(id = 0))
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(
+                        isSynced = true
+                    )
+                    repository.replaceLoadingEvent(localId, syncedEvent)
                 } else {
-                    Log.e("SyncWorker", "Loading sync failed: ${response.code()} - ${response.message()}")
+                    Log.e("SyncWorker", "Loading sync failed for event $localId: ${response.code()} - ${response.message()}")
                 }
             }
 

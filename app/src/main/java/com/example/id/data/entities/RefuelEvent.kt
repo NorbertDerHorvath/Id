@@ -6,7 +6,7 @@ import java.util.Date
 
 @Entity(tableName = "refuel_events")
 data class RefuelEvent(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val userId: String,
     val odometer: Int,
     val fuelType: String,

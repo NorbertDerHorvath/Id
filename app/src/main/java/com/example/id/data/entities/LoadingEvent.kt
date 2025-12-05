@@ -6,7 +6,7 @@ import java.util.Date
 
 @Entity(tableName = "loading_events")
 data class LoadingEvent(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val userId: String,
     val startTime: Date?,
     val endTime: Date?,

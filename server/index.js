@@ -105,7 +105,7 @@ app.get('/api/last-login', async (req, res) => {
 // Workday Events
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
-    const eventData = req.body;
+    const { id, ...eventData } = req.body; // Destructure to remove id
     if (!eventData.startTime) {
         eventData.startTime = new Date();
     }
@@ -130,7 +130,8 @@ app.get('/api/workday-events', async (req, res) => {
 // Refuel Events
 app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   try {
-    const event = await RefuelEvent.create({ ...req.body, userId: req.user.userId });
+    const { id, ...eventData } = req.body; // Destructure to remove id
+    const event = await RefuelEvent.create({ ...eventData, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving refuel event:', error);
@@ -152,7 +153,8 @@ app.get('/api/refuel-events', async (req, res) => {
 // Loading Events
 app.post('/api/loading-events', authenticateToken, async (req, res) => {
   try {
-    const event = await LoadingEvent.create({ ...req.body, userId: req.user.userId });
+    const { id, ...eventData } = req.body; // Destructure to remove id
+    const event = await LoadingEvent.create({ ...eventData, userId: req.user.userId });
     res.status(201).json(event);
   } catch (error) {
     console.error('Error saving loading event:', error);

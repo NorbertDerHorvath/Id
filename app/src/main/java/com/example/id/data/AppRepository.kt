@@ -33,6 +33,10 @@ class AppRepository @Inject constructor(
         workdayEventDao.updateWorkdayEvent(event)
     }
 
+    suspend fun replaceWorkdayEvent(oldId: Long, newEvent: WorkdayEvent) {
+        workdayEventDao.replaceWorkdayEvent(oldId, newEvent)
+    }
+
     // Refuel Events
     suspend fun insertRefuelEvent(event: RefuelEvent): Long {
         return refuelEventDao.insertRefuelEvent(event)
@@ -42,6 +46,10 @@ class AppRepository @Inject constructor(
         refuelEventDao.updateRefuelEvent(event)
     }
 
+    suspend fun replaceRefuelEvent(oldId: Long, newEvent: RefuelEvent) {
+        refuelEventDao.replaceRefuelEvent(oldId, newEvent)
+    }
+
     // Loading Events
     suspend fun insertLoadingEvent(event: LoadingEvent): Long {
         return loadingEventDao.insertLoadingEvent(event)
@@ -49,6 +57,10 @@ class AppRepository @Inject constructor(
 
     suspend fun updateLoadingEvent(event: LoadingEvent) {
         loadingEventDao.updateLoadingEvent(event)
+    }
+
+    suspend fun replaceLoadingEvent(oldId: Long, newEvent: LoadingEvent) {
+        loadingEventDao.replaceLoadingEvent(oldId, newEvent)
     }
 
     // --- The rest of the repository remains the same ---
@@ -196,5 +208,9 @@ class AppRepository @Inject constructor(
 
     suspend fun setLoadingEventSynced(id: Long) {
         loadingEventDao.setLoadingEventSynced(id)
+    }
+
+    suspend fun deleteAllData() {
+        apiService.deleteAllData()
     }
 }

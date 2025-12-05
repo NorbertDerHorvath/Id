@@ -66,7 +66,6 @@ fun MainScreen(
     var showCarPlateDialog by remember { mutableStateOf(false) }
     var carPlateForWorkday by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val activity = (LocalContext.current as? Activity)
 
     if (showCarPlateDialog) {
         CarPlateConfirmationDialog(
@@ -113,48 +112,6 @@ fun MainScreen(
         )
     }
 
-    MainScreenLayout(
-        isWorkdayStarted = isWorkdayStarted,
-        isBreakStarted = isBreakStarted,
-        isloadingStarted = isloadingStarted,
-        workDurationText = viewModel.formatDuration(workDuration),
-        breakDurationText = viewModel.formatDuration(breakDuration),
-        overtimeText = viewModel.formatDuration(overtime),
-        onWorkClick = {
-            if (isWorkdayStarted) {
-                showEndOdometerDialog = true
-            } else {
-                showCarPlateDialog = true
-            }
-        },
-        onBreakClick = { if (isBreakStarted) viewModel.endBreak() else viewModel.startBreak() },
-        onRefuelClick = { showRefuelDialog = true },
-        onSummaryClick = {
-            viewModel.generateSummary(context) // Pass context here
-            // navController.navigate("summary") // TODO: Restore summary screen
-        },
-        onManualDataEntryClick = { /* navController.navigate("manual_data_entry") */ },
-        onReportsClick = { navController.navigate("reports") },
-        onLogoutClick = { viewModel.logout() }
-    )
-}
-
-@Composable
-fun MainScreenLayout(
-    isWorkdayStarted: Boolean,
-    isBreakStarted: Boolean,
-    isloadingStarted: Boolean,
-    workDurationText: String,
-    breakDurationText: String,
-    overtimeText: String,
-    onWorkClick: () -> Unit,
-    onBreakClick: () -> Unit,
-    onRefuelClick: () -> Unit,
-    onSummaryClick: () -> Unit,
-    onManualDataEntryClick: () -> Unit,
-    onReportsClick: () -> Unit,
-    onLogoutClick: () -> Unit
-) {
     Box(modifier = Modifier.fillMaxSize()) { // Root Box for background
         Image(
             painter = painterResource(id = R.drawable.logo),
@@ -179,7 +136,7 @@ fun MainScreenLayout(
                 color = Color.Black
             )
             Text(
-                text = workDurationText,
+                text = viewModel.formatDuration(workDuration),
                 fontSize = 48.sp,
                 textAlign = TextAlign.Center,
                 color = Color.Black
@@ -191,41 +148,47 @@ fun MainScreenLayout(
                 color = Color.Black
             )
             Text(
-                text = breakDurationText,
+                text = viewModel.formatDuration(breakDuration),
                 fontSize = 32.sp,
                 textAlign = TextAlign.Center,
                 color = Color.Black
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "${stringResource(R.string.overtime)}: $overtimeText",
+                text = "${stringResource(R.string.overtime)}: ${viewModel.formatDuration(overtime)}",
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.Black
             )
             Spacer(modifier = Modifier.height(32.dp))
 
             Row {
-                Button(onClick = onWorkClick) {
+                Button(onClick = {
+                    if (isWorkdayStarted) {
+                        showEndOdometerDialog = true
+                    } else {
+                        showCarPlateDialog = true
+                    }
+                }) {
                     Text(if (isWorkdayStarted) stringResource(R.string.end_workday) else stringResource(R.string.start_workday))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = onBreakClick, enabled = isWorkdayStarted) {
+                Button(onClick = { if (isBreakStarted) viewModel.endBreak() else viewModel.startBreak() }, enabled = isWorkdayStarted) {
                     Text(if (isBreakStarted) stringResource(R.string.end_break) else stringResource(R.string.start_break))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Row {
-                Button(onClick = onRefuelClick, enabled = isWorkdayStarted) {
+                Button(onClick = { showRefuelDialog = true }, enabled = isWorkdayStarted) {
                     Text(stringResource(R.string.record_refuel))
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
             
-            Button(onClick = onReportsClick) {
+            Button(onClick = { navController.navigate("reports") }) {
                 Text("Jelentések")
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onLogoutClick) {
+            Button(onClick = { viewModel.logout() }) {
                 Text("Kijelentkezés")
             }
         }

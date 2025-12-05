@@ -5,6 +5,7 @@ import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -32,20 +33,23 @@ data class ValidateResponse(
 
 interface ApiService {
     @POST("api/workday-events")
-    suspend fun postWorkday(@Body workday: WorkdayEvent): Response<Void>
+    suspend fun postWorkday(@Body workday: WorkdayEvent): Response<WorkdayEvent>
 
     @PUT("api/workday-events/{id}")
-    suspend fun updateWorkday(@Path("id") id: Long, @Body workday: WorkdayEvent): Response<Void>
+    suspend fun updateWorkday(@Path("id") id: Long, @Body workday: WorkdayEvent): Response<WorkdayEvent>
 
     @POST("api/refuel-events")
-    suspend fun postRefuel(@Body refuel: RefuelEvent): Response<Void>
+    suspend fun postRefuel(@Body refuel: RefuelEvent): Response<RefuelEvent>
 
     @POST("api/loading-events")
-    suspend fun postLoading(@Body loading: LoadingEvent): Response<Void>
+    suspend fun postLoading(@Body loading: LoadingEvent): Response<LoadingEvent>
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
     @GET("api/validate-token")
     suspend fun validateToken(): Response<ValidateResponse>
+
+    @DELETE("api/all-data")
+    suspend fun deleteAllData(): Response<Void>
 }

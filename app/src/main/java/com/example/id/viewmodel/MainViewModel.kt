@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -94,43 +95,72 @@ class MainViewModel @Inject constructor(
     private var activeBreakEvent: BreakEvent? = null
 
     init {
-        if (authRepository.getToken() != null) {
-            validateToken()
-        } else {
-            _loginState.value = LoginUiState.Idle
+        initialize()
+    }
+
+    private fun initialize() {
+        viewModelScope.launch {
+            val token = authRepository.getToken()
+            if (token == null) {
+                _loginState.value = LoginUiState.Idle
+                return@launch
+            }
+
+            try {
+                val response = authRepository.validateToken()
+                if (response.isSuccessful && response.body()?.valid == true) {
+                    _loginState.value = LoginUiState.Success
+                    observeUserData()
+                } else {
+                    authRepository.clearToken()
+                    _loginState.value = LoginUiState.Error("Invalid token")
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
+            }
         }
     }
 
-    private fun updateUserData() {
+    private fun observeUserData() {
         viewModelScope.launch {
             val currentUserId = userId
-            if (currentUserId != "unknown_user") {
-                repository.getActiveWorkdayEvent(currentUserId).collect { event ->
-                    activeWorkdayEvent = event
-                    _isWorkdayStarted.value = event != null && event.endTime == null
-                    if (event == null || event.endTime != null) {
-                        updateDurations()
-                    }
-                }
-                repository.getActiveBreakEvent(currentUserId).collect { event ->
-                    activeBreakEvent = event
-                    _isBreakStarted.value = event != null && event.endTime == null
-                }
-                val activeLoadingEvent = repository.getActiveLoadingEvent(currentUserId).firstOrNull()
-                _isloadingStarted.value = activeLoadingEvent != null
-
-                while (true) {
-                    if (isWorkdayStarted.value) {
-                        updateDurations()
-                    }
-                    delay(1000)
-                }
-
-            } else {
+            if (currentUserId == "unknown_user") {
+                // Reset states if user is unknown
                 _isWorkdayStarted.value = false
                 _isBreakStarted.value = false
                 _isloadingStarted.value = false
                 activeWorkdayEvent = null
+                activeBreakEvent = null
+                return@launch
+            }
+
+            // Observe active workday, break and loading events
+            combine(
+                repository.getActiveWorkdayEvent(currentUserId),
+                repository.getActiveBreakEvent(currentUserId),
+                repository.getActiveLoadingEvent(currentUserId)
+            ) { workday, breakEvent, loadingEvent ->
+                activeWorkdayEvent = workday
+                _isWorkdayStarted.value = workday != null && workday.endTime == null
+
+                activeBreakEvent = breakEvent
+                _isBreakStarted.value = breakEvent != null && breakEvent.endTime == null
+
+                _isloadingStarted.value = loadingEvent != null
+
+                if (workday == null || workday.endTime != null) {
+                    updateDurations()
+                }
+            }.collect {}
+
+            // Timer to update durations every second
+            launch {
+                while (true) {
+                    if (_isWorkdayStarted.value) {
+                        updateDurations()
+                    }
+                    delay(1000)
+                }
             }
         }
     }
@@ -144,35 +174,11 @@ class MainViewModel @Inject constructor(
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, username).apply()
-                    updateUserData()
+                    initialize() // Re-initialize after login
                     triggerSync()
-                    _loginState.value = LoginUiState.Success
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
                     _loginState.value = LoginUiState.Error(errorBody)
-                }
-            } catch (e: Exception) {
-                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
-            }
-        }
-    }
-
-    fun validateToken() {
-        viewModelScope.launch {
-            val token = authRepository.getToken()
-            if (token == null) {
-                _loginState.value = LoginUiState.Error("No token found")
-                return@launch
-            }
-
-            try {
-                val response = authRepository.validateToken()
-                if (response.isSuccessful && response.body()?.valid == true) {
-                    updateUserData()
-                    _loginState.value = LoginUiState.Success
-                } else {
-                    authRepository.clearToken()
-                    _loginState.value = LoginUiState.Error("Invalid token")
                 }
             } catch (e: Exception) {
                 _loginState.value = LoginUiState.Error(e.message ?: "Network error")
@@ -184,10 +190,18 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.clearToken()
             prefs.edit().remove(USER_NAME_KEY).apply()
-            updateUserData()
+            // Reset state and stop observing user data
             _loginState.value = LoginUiState.Idle
+            activeWorkdayEvent = null
+            activeBreakEvent = null
+            _isWorkdayStarted.value = false
+            _isBreakStarted.value = false
+            _isloadingStarted.value = false
+            _workDuration.value = 0L
+            _breakDuration.value = 0L
         }
     }
+
 
     private suspend fun updateDurations() {
         val currentWorkday = activeWorkdayEvent
@@ -238,7 +252,6 @@ class MainViewModel @Inject constructor(
                 isSynced = false
             )
             repository.insertWorkdayEvent(newWorkday)
-            updateDurations()
             triggerSync()
         }
     }
@@ -272,7 +285,6 @@ class MainViewModel @Inject constructor(
                     _overtime.value = newCumulativeOvertime
                 }
 
-                updateDurations()
                 loadRecentEvents()
                 triggerSync()
             }
@@ -281,10 +293,9 @@ class MainViewModel @Inject constructor(
 
     fun startBreak() {
         viewModelScope.launch {
-            activeWorkdayEvent?.let {
-                val breakEvent = BreakEvent(workdayEventId = it.id, startTime = Date(), endTime = null, breakType = null, userId = this@MainViewModel.userId, isSynced = false)
+            activeWorkdayEvent?.let { workday ->
+                val breakEvent = BreakEvent(workdayEventId = workday.id, startTime = Date(), endTime = null, breakType = null, userId = this@MainViewModel.userId, isSynced = false)
                 repository.insertBreakEvent(breakEvent)
-                updateDurations()
                 triggerSync()
             }
         }
@@ -295,12 +306,11 @@ class MainViewModel @Inject constructor(
             activeBreakEvent?.let { breakEvent ->
                 val updatedBreak = breakEvent.copy(endTime = Date(), isSynced = false)
                 repository.updateBreakEvent(updatedBreak)
-                updateDurations()
                 triggerSync()
             }
         }
     }
-    
+
     fun recordRefuel(odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) {
         viewModelScope.launch {
             val location = getCurrentLocation()
@@ -359,7 +369,7 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun insertManualWorkday(startTime: Date, endTime: Date?, startLocation: String?, endLocation: String?, carPlate: String?, startOdometer: Int?, endOdometer: Int?, breakTime: Int, type: EventType) {
         viewModelScope.launch {
             val newWorkday = WorkdayEvent(
@@ -457,10 +467,22 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun deleteAllData() {
+        viewModelScope.launch {
+            try {
+                repository.deleteAllData()
+                // Optionally, you can add some user feedback here, e.g., a toast message.
+            } catch (e: Exception) {
+                // Handle error, e.g., show an error message.
+                Log.e("MainViewModel", "Error deleting all data", e)
+            }
+        }
+    }
+
     fun clearEditingEvent() {
         _editingEvent.value = null
     }
-    
+
     fun fetchData() {
         viewModelScope.launch {
             if (userId == "unknown_user") return@launch
@@ -514,7 +536,7 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun generateSummary(context: Context) {}
 
     private suspend fun getCurrentLocation(): Location? {
