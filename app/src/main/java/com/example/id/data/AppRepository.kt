@@ -231,4 +231,53 @@ class AppRepository @Inject constructor(
     suspend fun insertLoadingEvents(events: List<LoadingEvent>) {
         loadingEventDao.insertLoadingEvents(events)
     }
+
+    suspend fun syncData() {
+        // 1. Fetch all events from the server
+        val workdayEventsResponse = apiService.getWorkdayEvents()
+        val refuelEventsResponse = apiService.getRefuelEvents()
+        val loadingEventsResponse = apiService.getLoadingEvents()
+
+        if (workdayEventsResponse.isSuccessful && refuelEventsResponse.isSuccessful && loadingEventsResponse.isSuccessful) {
+            val serverWorkdayEvents = workdayEventsResponse.body() ?: emptyList()
+            val serverRefuelEvents = refuelEventsResponse.body() ?: emptyList()
+            val serverLoadingEvents = loadingEventsResponse.body() ?: emptyList()
+
+            // 2. Clear synced data from local database
+            clearSyncedData()
+
+            // 3. Insert server data into local database
+            insertWorkdayEvents(serverWorkdayEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
+            insertRefuelEvents(serverRefuelEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
+            insertLoadingEvents(serverLoadingEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
+        }
+
+        // 4. Sync unsynced local data
+        getUnsyncedWorkdayEvents().forEach { event ->
+            val localId = event.id
+            val response = apiService.postWorkday(event.copy(id = 0))
+            if (response.isSuccessful && response.body() != null) {
+                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                replaceWorkdayEvent(localId, syncedEvent)
+            }
+        }
+
+        getUnsyncedRefuelEvents().forEach { event ->
+            val localId = event.id
+            val response = apiService.postRefuel(event.copy(id = 0))
+            if (response.isSuccessful && response.body() != null) {
+                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                replaceRefuelEvent(localId, syncedEvent)
+            }
+        }
+
+        getUnsyncedLoadingEvents().forEach { event ->
+            val localId = event.id
+            val response = apiService.postLoading(event.copy(id = 0))
+            if (response.isSuccessful && response.body() != null) {
+                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                replaceLoadingEvent(localId, syncedEvent)
+            }
+        }
+    }
 }
