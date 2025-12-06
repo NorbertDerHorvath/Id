@@ -59,6 +59,26 @@
         const errorDiv = document.getElementById('error');
         const messageDiv = document.getElementById('message');
 
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                fetch('/api/validate-token', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = '/dashboard';
+                    } else {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('username');
+                    }
+                })
+                .catch(() => {
+                    // Stay on login page if server is not reachable
+                });
+            }
+        });
+
         function showRegisterView() {
             document.getElementById('login-view').style.display = 'none';
             document.getElementById('register-view').style.display = 'block';
@@ -141,16 +161,6 @@
                 errorDiv.textContent = 'Network error. Could not connect to the server.';
             }
         });
-
-        // Check for token on page load
-        if (localStorage.getItem('token')) {
-             fetch('/api/validate-token', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            }).then(res => {
-                if(res.ok) window.location.href = '/dashboard';
-                else localStorage.clear(); // Clear invalid token
-            })
-        }
     </script>
 </body>
 </html>

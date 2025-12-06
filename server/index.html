@@ -46,9 +46,14 @@
             fetchEvents('/api/refuel-events', 'refuel-events', formatRefuelEvent, token);
 
             document.getElementById('logout-btn').addEventListener('click', () => {
-                localStorage.removeItem('token');
-                 localStorage.removeItem('username');
-                window.location.href = '/';
+                fetch('/api/logout', { 
+                    method: 'POST' 
+                })
+                .finally(() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('username');
+                    window.location.href = '/';
+                });
             });
         });
 
