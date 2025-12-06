@@ -105,7 +105,7 @@ app.get('/api/last-login', async (req, res) => {
 // Workday Events
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
-    const { id, role, ...eventData } = req.body; // Destructure to remove id and role
+    const { id, ...eventData } = req.body; // Destructure to remove id
     if (!eventData.startTime) {
         eventData.startTime = new Date();
     }
@@ -182,7 +182,7 @@ app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    await sequelize.sync(); // Using sync without force/alter to avoid data loss
+    await sequelize.sync({ force: true }); 
     console.log('All models were synchronized successfully.');
   } catch (error) {
     console.error('Unable to connect to the database:', error);
