@@ -20,8 +20,13 @@
     </nav>
 
     <div class="container mt-4">
-        <h2>User Management</h2>
-        <button class="btn btn-primary mb-3" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>User Management</h2>
+            <div>
+                <button id="merge-companies-btn" class="btn btn-warning mr-2" style="display: none;">Merge Duplicate Companies</button>
+                <button class="btn btn-primary" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
+            </div>
+        </div>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -97,12 +102,28 @@
             if (!decodedToken) { window.location.href = '/login.html'; return; }
             currentUserRole = decodedToken.role;
 
+            if (currentUserRole === 'superadmin') {
+                document.getElementById('merge-companies-btn').style.display = 'inline-block';
+            }
+
             loadUsers();
             
             document.getElementById('logout-btn').addEventListener('click', () => {
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
                 window.location.href = '/login.html';
+            });
+            
+            document.getElementById('merge-companies-btn').addEventListener('click', async () => {
+                if (!confirm('Are you sure you want to merge duplicate companies? This action cannot be undone.')) return;
+                try {
+                    const response = await fetch('/api/admin/merge-companies', { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
+                    const resultText = await response.text(); 
+                    alert(resultText || 'Merge process finished.');
+                    loadUsers();
+                } catch (error) {
+                    alert('Error merging companies: ' + error.message);
+                }
             });
         });
 
@@ -133,17 +154,14 @@
             document.getElementById('user-form').reset();
             document.getElementById('userId').value = '';
             document.getElementById('username').readOnly = false;
-            document.getElementById('superadmin-role-option').style.display = 'none';
             document.getElementById('role-group').style.display = 'block';
-            document.getElementById('company-name-group').style.display = 'block';
-
-            if (currentUserRole === 'superadmin') {
-                document.getElementById('superadmin-role-option').style.display = 'block';
-            } else { // Admin
-                document.getElementById('role').value = 'user'; 
-                document.getElementById('company-name-group').style.display = 'none'; // Admins can't change company
-            }
+            document.getElementById('superadmin-role-option').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
+            document.getElementById('company-name-group').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
             
+            if(currentUserRole === 'admin') {
+                 document.getElementById('role').value = 'user';
+            }
+
             $('#userModal').modal('show');
         }
 
@@ -157,13 +175,10 @@
             document.getElementById('companyName').value = user.Company ? user.Company.name : '';
 
             document.getElementById('role-group').style.display = 'block';
-            document.getElementById('superadmin-role-option').style.display = 'none';
-            document.getElementById('company-name-group').style.display = 'none';
-
-            if (currentUserRole === 'superadmin') {
-                 document.getElementById('superadmin-role-option').style.display = 'block';
-                 document.getElementById('company-name-group').style.display = 'block';
-            }
+            document.getElementById('superadmin-role-option').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
+            
+            // Admins can't change company, Superadmins can
+            document.getElementById('company-name-group').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
             
             $('#userModal').modal('show');
         }
