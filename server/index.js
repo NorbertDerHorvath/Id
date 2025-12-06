@@ -32,7 +32,10 @@ app.post('/api/register', async (req, res) => {
         let companyId = null;
         if (role === 'admin' && companyName) {
             if (!adminEmail) return res.status(400).json({ error: 'Admin email is required for new admins.' });
-            const [company] = await Company.findOrCreate({ where: { name: companyName }, defaults: { name: companyName, adminEmail: adminEmail } });
+            const [company] = await Company.findOrCreate({
+                where: { name: companyName },
+                defaults: { name: companyName, adminEmail: adminEmail }
+            });
             companyId = company.id;
         } else if (role === 'user') {
             return res.status(403).json({ error: 'Users must be created by an Admin/Superadmin via the admin panel.' });
