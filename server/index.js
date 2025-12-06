@@ -182,9 +182,26 @@ app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    await sequelize.sync({ force: true }); 
+    await sequelize.sync({ force: true });
     console.log('All models were synchronized successfully.');
+
+    // Create a default user to ensure it exists after sync/force
+    const [company] = await Company.findOrCreate({
+      where: { name: 'Test Company' },
+      defaults: { adminEmail: 'admin@test.com' },
+    });
+
+    await User.findOrCreate({
+      where: { username: 'norbi' },
+      defaults: {
+        password: 'norbi',
+        role: 'driver',
+        companyId: company.id,
+      },
+    });
+    console.log('Default user created or already exists.');
+
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
+    console.error('Unable to connect to the database or create user:', error);
   }
 });
