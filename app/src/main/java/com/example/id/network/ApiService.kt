@@ -1,6 +1,5 @@
 package com.example.id.network
 
-import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
 import retrofit2.Response
@@ -10,6 +9,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 // Data classes for Login
 data class LoginRequest(
@@ -33,7 +33,11 @@ data class ValidateResponse(
 
 interface ApiService {
     @GET("api/workday-events")
-    suspend fun getWorkdayEvents(): Response<List<WorkdayEvent>>
+    suspend fun getWorkdayEvents(
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
+        @Query("carPlate") carPlate: String? = null
+    ): Response<List<WorkdayEvent>>
 
     @POST("api/workday-events")
     suspend fun postWorkday(@Body workday: WorkdayEvent): Response<WorkdayEvent>
@@ -45,7 +49,11 @@ interface ApiService {
     suspend fun deleteWorkday(@Path("id") id: Long): Response<Void>
 
     @GET("api/refuel-events")
-    suspend fun getRefuelEvents(): Response<List<RefuelEvent>>
+    suspend fun getRefuelEvents(
+        @Query("startDate") startDate: String? = null,
+        @Query("endDate") endDate: String? = null,
+        @Query("carPlate") carPlate: String? = null
+    ): Response<List<RefuelEvent>>
 
     @POST("api/refuel-events")
     suspend fun postRefuel(@Body refuel: RefuelEvent): Response<RefuelEvent>
@@ -55,19 +63,7 @@ interface ApiService {
 
     @DELETE("api/refuel-events/{id}")
     suspend fun deleteRefuel(@Path("id") id: Long): Response<Void>
-/*
-    @GET("api/loading-events")
-    suspend fun getLoadingEvents(): Response<List<LoadingEvent>>
 
-    @POST("api/loading-events")
-    suspend fun postLoading(@Body loading: LoadingEvent): Response<LoadingEvent>
-
-    @PUT("api/loading-events/{id}")
-    suspend fun updateLoading(@Path("id") id: Long, @Body loading: LoadingEvent): Response<LoadingEvent>
-
-    @DELETE("api/loading-events/{id}")
-    suspend fun deleteLoading(@Path("id") id: Long): Response<Void>
-*/
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 

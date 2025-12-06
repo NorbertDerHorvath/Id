@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.id.USER_NAME_KEY
 import com.example.id.data.AppRepository
@@ -29,13 +30,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -83,8 +85,10 @@ class MainViewModel @Inject constructor(
     val overtime: StateFlow<Long> = _overtime.asStateFlow()
     private val _summaryText = MutableStateFlow("")
     val summaryText: StateFlow<String> = _summaryText.asStateFlow()
-    private val _reportResults = MutableStateFlow<List<Any>>(emptyList())
-    val reportResults: StateFlow<List<Any>> = _reportResults.asStateFlow()
+    private val _workdayQueryResults = MutableStateFlow<List<WorkdayEvent>>(emptyList())
+    val workdayQueryResults: StateFlow<List<WorkdayEvent>> = _workdayQueryResults.asStateFlow()
+    private val _refuelQueryResults = MutableStateFlow<List<RefuelEvent>>(emptyList())
+    val refuelQueryResults: StateFlow<List<RefuelEvent>> = _refuelQueryResults.asStateFlow()
     private val _recentEvents = MutableStateFlow<List<Any>>(emptyList())
     val recentEvents: StateFlow<List<Any>> = _recentEvents.asStateFlow()
     private val _editingEvent = MutableStateFlow<Any?>(null)
@@ -128,7 +132,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val currentUserId = userId
             if (currentUserId == "unknown_user") {
-                // Reset states if user is unknown
                 _isWorkdayStarted.value = false
                 _isBreakStarted.value = false
                 _isloadingStarted.value = false
@@ -137,7 +140,6 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
 
-            // Observe active workday, break and loading events
             launch {
                 repository.getActiveWorkdayEvent(currentUserId).collect { workday ->
                     activeWorkdayEvent = workday
@@ -165,7 +167,6 @@ class MainViewModel @Inject constructor(
                 }
             }
 
-            // Timer to update durations every second
             launch {
                 while (true) {
                     if (_isWorkdayStarted.value) {
@@ -186,7 +187,7 @@ class MainViewModel @Inject constructor(
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, username).apply()
-                    initialize() // Re-initialize after login
+                    initialize()
                     triggerSync()
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
@@ -202,7 +203,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.clearToken()
             prefs.edit().remove(USER_NAME_KEY).apply()
-            // Reset state and stop observing user data
             _loginState.value = LoginUiState.Idle
             activeWorkdayEvent = null
             activeBreakEvent = null
@@ -284,7 +284,6 @@ class MainViewModel @Inject constructor(
                 )
                 repository.updateWorkdayEvent(updatedWorkday)
 
-                // Overtime calculation
                 val breaks = repository.getBreaksForWorkday(workday.localId).first()
                 val totalBreakDuration = calculateBreakDuration(breaks, endTime.time)
                 val netWorkDuration = endTime.time - workday.startTime.time - totalBreakDuration
@@ -476,9 +475,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 repository.deleteAllData()
-                // Optionally, you can add some user feedback here, e.g., a toast message.
             } catch (e: Exception) {
-                // Handle error, e.g., show an error message.
                 Log.e("MainViewModel", "Error deleting all data", e)
             }
         }
@@ -488,28 +485,100 @@ class MainViewModel @Inject constructor(
         _editingEvent.value = null
     }
 
-    fun fetchData() {
+    fun clearWorkdayResults() {
+        _workdayQueryResults.value = emptyList()
+    }
+
+    fun clearRefuelResults() {
+        _refuelQueryResults.value = emptyList()
+    }
+
+    fun queryWorkdays(startDate: String, endDate: String, carPlate: String?) {
         viewModelScope.launch {
             if (userId == "unknown_user") return@launch
+            synchronizeAndWait()
+            val dateFormat = SimpleDateFormat("yyyy.MM.dd", Locale.getDefault())
 
-            val workdayEvents = repository.getAllWorkdayEvents(userId).firstOrNull() ?: emptyList()
-            val refuelEvents = repository.getAllRefuelEvents(userId).firstOrNull() ?: emptyList()
-            val loadingEvents = repository.getAllLoadingEvents(userId).firstOrNull() ?: emptyList()
-
-            val combinedEvents = mutableListOf<Any>()
-            combinedEvents.addAll(workdayEvents)
-            combinedEvents.addAll(refuelEvents)
-            combinedEvents.addAll(loadingEvents)
-
-            _reportResults.value = combinedEvents.sortedByDescending { event ->
-                when (event) {
-                    is WorkdayEvent -> event.startTime
-                    is RefuelEvent -> event.timestamp
-                    is LoadingEvent -> event.startTime
-                    else -> Date(0)
+            val startCal = Calendar.getInstance().apply {
+                if (startDate.isNotBlank()) {
+                    time = dateFormat.parse(startDate)!!
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
                 }
             }
+            val endCal = Calendar.getInstance().apply {
+                if (endDate.isNotBlank()) {
+                    time = dateFormat.parse(endDate)!!
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+            }
+
+            val start = if (startDate.isNotBlank()) startCal.time else null
+            val end = if (endDate.isNotBlank()) endCal.time else null
+
+            val workdayEvents = repository.getAllWorkdayEvents(userId).firstOrNull() ?: emptyList<WorkdayEvent>()
+
+            val filteredWorkdays = workdayEvents.filter<WorkdayEvent> { event ->
+                val eventDate = event.startTime
+                val carPlateMatch = carPlate.isNullOrBlank() || event.carPlate?.contains(carPlate, ignoreCase = true) == true
+                val dateMatch = (start == null || !eventDate.before(start)) && (end == null || !eventDate.after(end))
+                dateMatch && carPlateMatch
+            }
+            _workdayQueryResults.value = filteredWorkdays
         }
+    }
+
+    fun queryRefuels(startDate: String, endDate: String, carPlate: String?) {
+        viewModelScope.launch {
+            if (userId == "unknown_user") return@launch
+            synchronizeAndWait()
+            val dateFormat = SimpleDateFormat("yyyy.MM.dd", Locale.getDefault())
+
+            val startCal = Calendar.getInstance().apply {
+                if (startDate.isNotBlank()) {
+                    time = dateFormat.parse(startDate)!!
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+            }
+            val endCal = Calendar.getInstance().apply {
+                if (endDate.isNotBlank()) {
+                    time = dateFormat.parse(endDate)!!
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+            }
+
+            val start = if (startDate.isNotBlank()) startCal.time else null
+            val end = if (endDate.isNotBlank()) endCal.time else null
+
+            val refuelEvents = repository.getAllRefuelEvents(userId).firstOrNull() ?: emptyList<RefuelEvent>()
+
+            val filteredRefuels = refuelEvents.filter<RefuelEvent> { event ->
+                val eventDate = event.timestamp
+                val carPlateMatch = carPlate.isNullOrBlank() || event.carPlate.contains(carPlate, ignoreCase = true)
+                val dateMatch = (start == null || !eventDate.before(start)) && (end == null || !eventDate.after(end))
+                dateMatch && carPlateMatch
+            }
+            _refuelQueryResults.value = filteredRefuels
+        }
+    }
+
+    private suspend fun synchronizeAndWait() {
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        workManager.enqueue(syncRequest)
+        workManager.getWorkInfoByIdFlow(syncRequest.id)
+            .filter { it.state.isFinished }
+            .first()
     }
 
     private fun triggerSync() {

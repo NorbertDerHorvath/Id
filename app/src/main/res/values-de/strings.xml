@@ -119,9 +119,11 @@
     <string name="edit_refuel">Tanken bearbeiten</string>
     <string name="fuel_type_diesel">Diesel</string>
     <string name="fuel_type_adblue">AdBlue</string>
+    <string name="fuel_type_petrol">Benzin</string>
     <string name="payment_method_chip">Chip</string>
     <string name="payment_method_dkv">DKV Karte</string>
     <string name="payment_method_cash">Bar</string>
+    <string name="payment_method_card">Bankkarte</string>
     <string name="add_new_event">Neues Ereignis hinzufügen</string>
     <string name="past_7_days_events">Ereignisse der letzten 7 Tage</string>
     <string name="start_time_label">Beginn:</string>
@@ -148,6 +150,7 @@
     <string name="car_plate_label">Kennzeichen:</string>
     <string name="start_odometer_label">Anfangskilometerstand:</string>
     <string name="end_odometer_label">Endkilometerstand:</string>
+    <string name="value_in_eur">Wert (EUR)</string>
     <plurals name="days_plural">
         <item quantity="one">%d Tag</item>
         <item quantity="other">%d Tage</item>

@@ -16,7 +16,7 @@ import com.example.id.data.entities.WorkdayEvent
 
 @Database(
     entities = [WorkdayEvent::class, BreakEvent::class, RefuelEvent::class, LoadingEvent::class],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

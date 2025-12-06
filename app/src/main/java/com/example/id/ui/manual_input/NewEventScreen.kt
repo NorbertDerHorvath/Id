@@ -23,8 +23,8 @@ fun NewEventScreen(
                 showRefuelDialog = false
                 navController.popBackStack()
             },
-            onConfirm = { odometer, fuelType, fuelAmount, paymentMethod, carPlate ->
-                viewModel.recordRefuel(odometer, fuelType, fuelAmount, paymentMethod, carPlate)
+            onConfirm = { odometer, fuelType, fuelAmount, paymentMethod, carPlate, value ->
+                viewModel.recordRefuel(odometer, fuelType, fuelAmount, paymentMethod, carPlate, value)
                 showRefuelDialog = false
                 navController.popBackStack()
             },

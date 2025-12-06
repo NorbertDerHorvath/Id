@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.id.R
 import com.example.id.data.entities.WorkdayEvent
+import com.example.id.ui.dialogs.RefuelDialog
 import com.example.id.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -112,8 +113,8 @@ fun MainScreen(
     if (showRefuelDialog) {
         RefuelDialog(
             onDismiss = { showRefuelDialog = false },
-            onConfirm = { odometer, fuelType, fuelAmount, paymentMethod, carPlate ->
-                viewModel.recordRefuel(odometer, fuelType, fuelAmount, paymentMethod, carPlate)
+            onConfirm = { odometer, fuelType, fuelAmount, paymentMethod, carPlate, value ->
+                viewModel.recordRefuel(odometer, fuelType, fuelAmount, paymentMethod, carPlate, value)
                 showRefuelDialog = false
             },
             currentCarPlate = ""
@@ -138,7 +139,7 @@ fun MainScreen(
         ) {
             // Top controls and timers
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -196,8 +197,8 @@ fun MainScreen(
                 }
                 Spacer(modifier = Modifier.height(32.dp))
 
-                Button(onClick = { navController.navigate("reports") }) {
-                    Text("Jelentések")
+                Button(onClick = { navController.navigate("query_screen") }) {
+                    Text(stringResource(R.string.queries))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = { viewModel.logout() }) {
@@ -328,137 +329,6 @@ fun OdometerDialog(title: String, onDismiss: () -> Unit, onConfirm: (odometer: I
         },
         confirmButton = {
             TextButton(onClick = { odometer.toIntOrNull()?.let(onConfirm) }) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun RefuelDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) -> Unit,
-    currentCarPlate: String?
-) {
-    val dieselStr = stringResource(R.string.fuel_type_diesel)
-    val adblueStr = stringResource(R.string.fuel_type_adblue)
-    val chipStr = stringResource(R.string.payment_method_chip)
-    val dkvStr = stringResource(R.string.payment_method_dkv)
-    val cashStr = stringResource(R.string.payment_method_cash)
-
-    var odometer by remember { mutableStateOf("") }
-    var fuelType by remember { mutableStateOf(dieselStr) }
-    var fuelAmount by remember { mutableStateOf("") }
-    var paymentMethod by remember { mutableStateOf(chipStr) }
-    var carPlate by remember { mutableStateOf(currentCarPlate ?: "") }
-
-    val fuelTypes = listOf(dieselStr, adblueStr)
-    val paymentMethods = listOf(chipStr, dkvStr, cashStr)
-
-    var fuelTypeExpanded by remember { mutableStateOf(false) }
-    var paymentMethodExpanded by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.refuel_details), color = Color.Black) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = odometer,
-                    onValueChange = { odometer = it },
-                    label = { Text(stringResource(R.string.odometer), color = Color.Black) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                ExposedDropdownMenuBox(
-                    expanded = fuelTypeExpanded,
-                    onExpandedChange = { fuelTypeExpanded = !fuelTypeExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = fuelType,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.fuel_type), color = Color.Black) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fuelTypeExpanded) },
-                        modifier = Modifier.menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = fuelTypeExpanded,
-                        onDismissRequest = { fuelTypeExpanded = false }
-                    ) {
-                        fuelTypes.forEach { selectionOption ->
-                            DropdownMenuItem(
-                                text = { Text(selectionOption, color = Color.Black) },
-                                onClick = {
-                                    fuelType = selectionOption
-                                    fuelTypeExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = fuelAmount,
-                    onValueChange = { fuelAmount = it },
-                    label = { Text(stringResource(R.string.fuel_amount), color = Color.Black) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                ExposedDropdownMenuBox(
-                    expanded = paymentMethodExpanded,
-                    onExpandedChange = { paymentMethodExpanded = !paymentMethodExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = paymentMethod,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text(stringResource(R.string.payment_method), color = Color.Black) },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = paymentMethodExpanded) },
-                        modifier = Modifier.menuAnchor()
-                    )
-                    ExposedDropdownMenu(
-                        expanded = paymentMethodExpanded,
-                        onDismissRequest = { paymentMethodExpanded = false }
-                    ) {
-                        paymentMethods.forEach { selectionOption ->
-                            DropdownMenuItem(
-                                text = { Text(selectionOption, color = Color.Black) },
-                                onClick = {
-                                    paymentMethod = selectionOption
-                                    paymentMethodExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = carPlate,
-                    onValueChange = { carPlate = it },
-                    label = { Text(stringResource(R.string.car_plate)) }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(
-                    odometer.toIntOrNull() ?: 0,
-                    fuelType,
-                    fuelAmount.toDoubleOrNull() ?: 0.0,
-                    paymentMethod,
-                    carPlate
-                )
-            }) {
                 Text(stringResource(R.string.save))
             }
         },

@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Op } = require('./models');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const authenticateToken = require('./middleware/authenticateToken');
@@ -77,20 +77,6 @@ app.get('/api/validate-token', authenticateToken, (req, res) => {
     res.json({ valid: true });
 });
 
-/*
-app.get('/api/last-login', async (req, res) => {
-  try {
-    const user = await User.findOne({ order: [['lastLoginTime', 'DESC']] });
-    if (user) {
-      res.json({ time: user.lastLoginTime, location: user.lastLoginLocation });
-    } else {
-      res.json({ time: 'N/A', location: 'N/A' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch last login.' });
-  }
-});
-*/
 
 // --- Data API Routes (Protected or Public as needed) ---
 
@@ -107,12 +93,28 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/workday-events', async (req, res) => {
-  try {
-    const events = await WorkdayEvent.findAll({ include: User, order: [['startTime', 'DESC']] });
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch workday events.' });
-  }
+    try {
+        const { startDate, endDate, carPlate } = req.query;
+        const whereClause = {};
+
+        if (startDate && endDate) {
+            whereClause.startTime = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+        if (carPlate) {
+            whereClause.carPlate = { [Op.iLike]: `%${carPlate}%` };
+        }
+
+        const events = await WorkdayEvent.findAll({
+            where: whereClause,
+            include: User,
+            order: [['startTime', 'DESC']]
+        });
+        res.json(events);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch workday events.' });
+    }
 });
 
 app.get('/api/workday-events/:id', async (req, res) => { // Not authenticated for simplicity on the web editor
@@ -159,12 +161,28 @@ app.delete('/api/workday-events/:id', async (req, res) => { // Not authenticated
 
 // Refuel Events
 app.get('/api/refuel-events', async (req, res) => {
-  try {
-    const events = await RefuelEvent.findAll({ include: User, order: [['timestamp', 'DESC']] });
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch refuel events.' });
-  }
+    try {
+        const { startDate, endDate, carPlate } = req.query;
+        const whereClause = {};
+
+        if (startDate && endDate) {
+            whereClause.timestamp = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        }
+        if (carPlate) {
+            whereClause.carPlate = { [Op.iLike]: `%${carPlate}%` };
+        }
+
+        const events = await RefuelEvent.findAll({
+            where: whereClause,
+            include: User,
+            order: [['timestamp', 'DESC']]
+        });
+        res.json(events);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch refuel events.' });
+    }
 });
 
 app.get('/api/refuel-events/:id', async (req, res) => {
@@ -222,48 +240,6 @@ app.delete('/api/refuel-events/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to delete refuel event.' });
     }
 });
-
-/*
-// Loading Events
-app.get('/api/loading-events', async (req, res) => {
-  try {
-    const events = await LoadingEvent.findAll({ include: User, order: [['startTime', 'DESC']] });
-    res.json(events);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch loading events.' });
-  }
-});
-
-app.post('/api/loading-events', authenticateToken, async (req, res) => {
-    try {
-        const { id, ...eventData } = req.body;
-        const event = await LoadingEvent.create({ ...eventData, userId: req.user.userId });
-        const newEvent = await LoadingEvent.findByPk(event.id, { include: User });
-        res.status(201).json(newEvent);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to save loading event.' });
-    }
-});
-
-app.put('/api/loading-events/:id', authenticateToken, async (req, res) => {
-    try {
-        const event = await LoadingEvent.findByPk(req.params.id);
-        if (event) {
-             if (event.userId !== req.user.userId && req.user.role !== 'admin') {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-            const { id, ...eventData } = req.body;
-            await event.update(eventData);
-            const updatedEvent = await LoadingEvent.findByPk(req.params.id, { include: User });
-            res.json(updatedEvent);
-        } else {
-            res.status(404).json({ error: 'LoadingEvent not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to update loading event.' });
-    }
-});
-*/
 
 // Start server and sync database
 app.listen(PORT, async () => {

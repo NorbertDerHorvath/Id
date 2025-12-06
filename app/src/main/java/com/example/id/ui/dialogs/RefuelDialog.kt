@@ -33,9 +33,11 @@ fun RefuelDialog(
 ) {
     val dieselStr = stringResource(R.string.fuel_type_diesel)
     val adblueStr = stringResource(R.string.fuel_type_adblue)
+    val petrolStr = stringResource(R.string.fuel_type_petrol)
     val chipStr = stringResource(R.string.payment_method_chip)
     val dkvStr = stringResource(R.string.payment_method_dkv)
     val cashStr = stringResource(R.string.payment_method_cash)
+    val cardStr = stringResource(R.string.payment_method_card)
 
     var odometer by remember { mutableStateOf("") }
     var fuelType by remember { mutableStateOf(dieselStr) }
@@ -44,8 +46,8 @@ fun RefuelDialog(
     var paymentMethod by remember { mutableStateOf(chipStr) }
     var carPlate by remember { mutableStateOf(currentCarPlate ?: "") }
 
-    val fuelTypes = listOf(dieselStr, adblueStr)
-    val paymentMethods = listOf(chipStr, dkvStr, cashStr)
+    val fuelTypes = listOf(dieselStr, adblueStr, petrolStr)
+    val paymentMethods = listOf(chipStr, dkvStr, cashStr, cardStr)
 
     var fuelTypeExpanded by remember { mutableStateOf(false) }
     var paymentMethodExpanded by remember { mutableStateOf(false) }
@@ -103,7 +105,7 @@ fun RefuelDialog(
                 OutlinedTextField(
                     value = value,
                     onValueChange = { value = it },
-                    label = { Text(stringResource(R.string.value_in_huf), color = Color.Black) },
+                    label = { Text(stringResource(R.string.value_in_eur), color = Color.Black) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 Spacer(modifier = Modifier.height(8.dp))

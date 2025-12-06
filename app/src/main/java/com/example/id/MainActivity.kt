@@ -17,12 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.id.ui.login.LoginScreen
 import com.example.id.ui.main.MainScreen
-import com.example.id.ui.reports.ReportsScreen
+import com.example.id.ui.query.QueryScreen
+import com.example.id.ui.query.QueryResultScreen
 import com.example.id.ui.theme.IdTheme
 import com.example.id.viewmodel.LoginUiState
 import com.example.id.viewmodel.MainViewModel
@@ -85,8 +88,15 @@ fun AppNavigation() {
         composable("main") {
             MainScreen(navController = navController, viewModel = mainViewModel)
         }
-        composable("reports") {
-            ReportsScreen(navController = navController, viewModel = mainViewModel)
+        composable("query_screen") {
+            QueryScreen(navController = navController, viewModel = mainViewModel)
+        }
+        composable(
+            "query_result/{queryType}",
+            arguments = listOf(navArgument("queryType") { type = NavType.StringType })
+        ) {
+            val queryType = it.arguments?.getString("queryType") ?: ""
+            QueryResultScreen(navController = navController, viewModel = mainViewModel, queryType = queryType)
         }
     }
 
