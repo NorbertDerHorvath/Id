@@ -40,6 +40,19 @@
     <div id="loading-events">Betöltés...</div>
 
     <script>
+        // Helper to format date as dd.mm.yyyy hh:mm
+        function formatHuDate(dateString) {
+            if (!dateString) return 'N/A';
+            const d = new Date(dateString);
+            const pad = (num) => String(num).padStart(2, '0');
+            const day = pad(d.getDate());
+            const month = pad(d.getMonth() + 1);
+            const year = d.getFullYear();
+            const hour = pad(d.getHours());
+            const minute = pad(d.getMinutes());
+            return `${day}.${month}.${year} ${hour}:${minute}`;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const fetchData = async (endpoint, elementId, columns, isWorkday = false) => {
                 const targetElement = document.getElementById(elementId);
@@ -81,8 +94,13 @@
                                 } else {
                                     value = 'N/A';
                                 }
-                            } else if (col.key.includes('Time')) {
-                                value = item[col.key] ? new Date(item[col.key]).toLocaleString('hu-HU', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
+                            } else if (col.key === 'breakTime') {
+                                const breakMinutes = item.breakTime || 0;
+                                const hours = Math.floor(breakMinutes / 60);
+                                const minutes = breakMinutes % 60;
+                                value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                            } else if (col.key.includes('Time') || col.key.includes('timestamp')) {
+                                value = formatHuDate(item[col.key]);
                             } else {
                                 value = col.key.split('.').reduce((o, i) => o ? o[i] : '', item);
                             }
@@ -111,8 +129,7 @@
                     const response = await fetch('/api/last-login');
                     if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
                     const data = await response.json();
-                    const loginTime = data.time ? new Date(data.time).toLocaleString('hu-HU') : 'N/A';
-                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${loginTime}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
+                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${formatHuDate(data.time)}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
                 } catch (error) {
                     targetElement.innerHTML = `<p style="color: red;">Hiba a betöltés közben: ${error.message}</p>`;
                 }
@@ -125,7 +142,7 @@
                 { header: 'Munkaidő vége', key: 'endTime' },
                 { header: 'Városa', key: 'endLocation' },
                 { header: 'Összes netto munkaidő', key: 'netWorkTime' },
-                { header: 'Összes szünet (perc)', key: 'breakTime' },
+                { header: 'Összes szünet', key: 'breakTime' },
                 { header: 'Kezdő km', key: 'startOdometer' },
                 { header: 'Záró km', key: 'endOdometer' },
                 { header: 'Megtett km', key: 'totalKm' },

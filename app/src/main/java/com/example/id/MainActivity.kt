@@ -1,12 +1,21 @@
 package com.example.id
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -17,6 +26,8 @@ import com.example.id.ui.reports.ReportsScreen
 import com.example.id.ui.theme.IdTheme
 import com.example.id.viewmodel.LoginUiState
 import com.example.id.viewmodel.MainViewModel
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -25,7 +36,30 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             IdTheme {
-                AppNavigation()
+                PermissionWrapper()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalPermissionsApi::class)
+@Composable
+fun PermissionWrapper() {
+    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
+
+    if (locationPermissionState.hasPermission) {
+        AppNavigation()
+    } else {
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Text(
+                text = "A helymeghatározás engedélyezése szükséges az alkalmazás működéséhez.",
+                modifier = Modifier.align(Alignment.Center)
+            )
+            Button(
+                onClick = { locationPermissionState.launchPermissionRequest() },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Text("Engedély kérése")
             }
         }
     }
@@ -41,12 +75,10 @@ fun AppNavigation() {
         mainViewModel.synchronizeWithServer()
     }
 
-    // Start destination depends on whether the user is already logged in
     val startDestination = if (loginState is LoginUiState.Success) "main" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
-            // The LoginScreen now handles its own navigation on success
             LoginScreen(navController = navController, viewModel = mainViewModel)
         }
         composable("main") {
@@ -55,10 +87,8 @@ fun AppNavigation() {
         composable("reports") {
             ReportsScreen(navController = navController, viewModel = mainViewModel)
         }
-        // Add other composable routes from the old navigation graph here as needed
     }
 
-    // This LaunchedEffect will react to logout
     LaunchedEffect(loginState) {
         if (loginState is LoginUiState.Idle && navController.currentBackStackEntry?.destination?.route != "login") {
             navController.navigate("login") {
