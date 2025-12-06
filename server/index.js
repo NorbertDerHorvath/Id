@@ -32,10 +32,7 @@ app.post('/api/register', async (req, res) => {
         let companyId = null;
         if (role === 'admin' && companyName) {
             if (!adminEmail) return res.status(400).json({ error: 'Admin email is required for new admins.' });
-            const [company] = await Company.findOrCreate({
-                where: { name: companyName },
-                defaults: { name: companyName, adminEmail: adminEmail }
-            });
+            const [company] = await Company.findOrCreate({ where: { name: companyName }, defaults: { name: companyName, adminEmail: adminEmail } });
             companyId = company.id;
         } else if (role === 'user') {
             return res.status(403).json({ error: 'Users must be created by an Admin/Superadmin via the admin panel.' });
@@ -235,6 +232,24 @@ adminRouter.put('/users/:userId', async (req, res) => {
         const { password: _, ...userResponse } = userToUpdate.get({ plain: true });
         res.json({ message: 'User updated successfully.', user: userResponse });
     } catch (error) { res.status(500).json({ error: 'Failed to update user.' }); }
+});
+
+adminRouter.get('/debug-dump', async (req, res) => {
+    if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden: Superadmin only.' });
+    }
+    try {
+        const users = await User.findAll({
+            attributes: ['id', 'username', 'role', 'companyId', 'realName'],
+            include: { model: Company, attributes: ['id', 'name'] },
+            order: [['companyId', 'ASC'], ['username', 'ASC']]
+        });
+        const companies = await Company.findAll({order: [['name', 'ASC']]});
+        res.json({ users, companies });
+    } catch (error) {
+        console.error('Error during debug dump:', error);
+        res.status(500).json({ error: 'Failed to generate debug dump.' });
+    }
 });
 
 adminRouter.get('/merge-companies', async (req, res) => {
