@@ -213,7 +213,7 @@ class MainViewModel @Inject constructor(
         if (currentWorkday != null) {
             val workStart = currentWorkday.startTime.time
             val workEnd = currentWorkday.endTime?.time ?: System.currentTimeMillis()
-            val breaks = repository.getBreaksForWorkday(currentWorkday.id).first()
+            val breaks = repository.getBreaksForWorkday(currentWorkday.localId).first()
             _breakDuration.value = calculateBreakDuration(breaks)
             _workDuration.value = workEnd - workStart - _breakDuration.value
         } else {
@@ -278,7 +278,7 @@ class MainViewModel @Inject constructor(
                 repository.updateWorkdayEvent(updatedWorkday)
 
                 // Overtime calculation
-                val breaks = repository.getBreaksForWorkday(workday.id).first()
+                val breaks = repository.getBreaksForWorkday(workday.localId).first()
                 val totalBreakDuration = calculateBreakDuration(breaks, endTime.time)
                 val netWorkDuration = endTime.time - workday.startTime.time - totalBreakDuration
                 val eightHoursInMillis = 8 * 60 * 60 * 1000L
@@ -299,7 +299,7 @@ class MainViewModel @Inject constructor(
     fun startBreak() {
         viewModelScope.launch {
             activeWorkdayEvent?.let { workday ->
-                val breakEvent = BreakEvent(workdayEventId = workday.id, startTime = Date(), endTime = null, breakType = null, userId = this@MainViewModel.userId, isSynced = false)
+                val breakEvent = BreakEvent(workdayEventId = workday.localId, startTime = Date(), endTime = null, breakType = null, userId = this@MainViewModel.userId, isSynced = false)
                 repository.insertBreakEvent(breakEvent)
                 triggerSync()
             }

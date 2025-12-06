@@ -158,6 +158,22 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await RefuelEvent.findByPk(req.params.id);
+        if (event) {
+            const { id, ...eventData } = req.body;
+            await event.update(eventData);
+            res.json(event);
+        } else {
+            res.status(404).json({ error: 'RefuelEvent not found' });
+        }
+    } catch (error) {
+        console.error('Error updating refuel event:', error);
+        res.status(500).json({ error: 'Failed to update refuel event.' });
+    }
+});
+
 app.get('/api/refuel-events', async (req, res) => {
   try {
     const events = await RefuelEvent.findAll({ include: User });
@@ -180,6 +196,22 @@ app.post('/api/loading-events', authenticateToken, async (req, res) => {
     console.error('Error saving loading event:', error);
     res.status(500).json({ error: 'Failed to save loading event.' });
   }
+});
+
+app.put('/api/loading-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await LoadingEvent.findByPk(req.params.id);
+        if (event) {
+            const { id, ...eventData } = req.body;
+            await event.update(eventData);
+            res.json(event);
+        } else {
+            res.status(404).json({ error: 'LoadingEvent not found' });
+        }
+    } catch (error) {
+        console.error('Error updating loading event:', error);
+        res.status(500).json({ error: 'Failed to update loading event.' });
+    }
 });
 
 app.get('/api/loading-events', async (req, res) => {

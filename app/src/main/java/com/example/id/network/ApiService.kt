@@ -47,11 +47,17 @@ interface ApiService {
     @POST("api/refuel-events")
     suspend fun postRefuel(@Body refuel: RefuelEvent): Response<RefuelEvent>
 
+    @PUT("api/refuel-events/{id}")
+    suspend fun updateRefuel(@Path("id") id: Long, @Body refuel: RefuelEvent): Response<RefuelEvent>
+
     @GET("api/loading-events")
     suspend fun getLoadingEvents(): Response<List<LoadingEvent>>
 
     @POST("api/loading-events")
     suspend fun postLoading(@Body loading: LoadingEvent): Response<LoadingEvent>
+
+    @PUT("api/loading-events/{id}")
+    suspend fun updateLoading(@Path("id") id: Long, @Body loading: LoadingEvent): Response<LoadingEvent>
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>

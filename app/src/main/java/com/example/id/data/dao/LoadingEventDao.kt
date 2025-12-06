@@ -36,19 +36,19 @@ interface LoadingEventDao {
         """)
     fun getLoadingEventsForReport(userId: String, startDate: Date?, endDate: Date?): Flow<List<LoadingEvent>>
 
-    @Query("SELECT * FROM loading_events WHERE id = :id")
+    @Query("SELECT * FROM loading_events WHERE localId = :id")
     suspend fun getLoadingEventById(id: Long): LoadingEvent?
 
-    @Query("DELETE FROM loading_events WHERE id = :id")
+    @Query("DELETE FROM loading_events WHERE localId = :id")
     suspend fun deleteLoadingEventById(id: Long)
 
     @Query("SELECT * FROM loading_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
     suspend fun getLoadingEventsAfter(userId: String, sevenDaysAgo: Date): List<LoadingEvent>
 
-    @Query("SELECT * FROM loading_events WHERE isSynced = 0 AND endTime IS NOT NULL")
+    @Query("SELECT * FROM loading_events WHERE isSynced = 0")
     suspend fun getUnsyncedLoadingEvents(): List<LoadingEvent>
 
-    @Query("UPDATE loading_events SET isSynced = 1 WHERE id = :id")
+    @Query("UPDATE loading_events SET isSynced = 1 WHERE localId = :id")
     suspend fun setLoadingEventSynced(id: Long)
 
     @Transaction

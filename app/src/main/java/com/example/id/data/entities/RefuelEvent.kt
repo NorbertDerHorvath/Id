@@ -9,7 +9,8 @@ import com.example.id.data.entities.User
 
 @Entity(tableName = "refuel_events")
 data class RefuelEvent(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @PrimaryKey(autoGenerate = true) var localId: Long = 0,
+    @SerializedName("id") val id: Long? = null, // Server ID
     @SerializedName("userId") var userId: String,
     val odometer: Int,
     val fuelType: String,

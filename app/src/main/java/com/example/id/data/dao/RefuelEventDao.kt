@@ -36,10 +36,10 @@ interface RefuelEventDao {
         """)
     fun getRefuelEventsForReport(userId: String, startDate: Date?, endDate: Date?, carPlate: String?, fuelType: String?, paymentMethod: String?): Flow<List<RefuelEvent>>
 
-    @Query("SELECT * FROM refuel_events WHERE id = :id")
+    @Query("SELECT * FROM refuel_events WHERE localId = :id")
     suspend fun getRefuelEventById(id: Long): RefuelEvent?
 
-    @Query("DELETE FROM refuel_events WHERE id = :id")
+    @Query("DELETE FROM refuel_events WHERE localId = :id")
     suspend fun deleteRefuelEventById(id: Long)
 
     @Query("SELECT * FROM refuel_events WHERE userId = :userId AND timestamp >= :sevenDaysAgo ORDER BY timestamp DESC")
@@ -48,7 +48,7 @@ interface RefuelEventDao {
     @Query("SELECT * FROM refuel_events WHERE isSynced = 0")
     suspend fun getUnsyncedRefuelEvents(): List<RefuelEvent>
 
-    @Query("UPDATE refuel_events SET isSynced = 1 WHERE id = :id")
+    @Query("UPDATE refuel_events SET isSynced = 1 WHERE localId = :id")
     suspend fun setRefuelEventSynced(id: Long)
 
     @Transaction

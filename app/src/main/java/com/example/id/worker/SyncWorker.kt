@@ -32,48 +32,54 @@ class SyncWorker @AssistedInject constructor(
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
-                if (event.serverId == null) { // New event, not yet on server
-                    val response = apiService.postWorkday(event.copy(id = 0))
+                if (event.id == null) { // New event, not yet on server
+                    val response = apiService.postWorkday(event)
                     if (response.isSuccessful && response.body() != null) {
                         val serverEvent = response.body()!!
                         val updatedEvent = event.copy(
-                            serverId = serverEvent.serverId,
+                            id = serverEvent.id,
                             isSynced = true
                         )
                         repository.updateWorkdayEvent(updatedEvent)
                     }
                 } else { // Existing event, needs update on server
-                    apiService.updateWorkday(event.serverId, event)
+                    apiService.updateWorkday(event.id, event)
                 }
             }
 
-            // Refuel events (assuming they are only created, not updated)
+            // Refuel events
             val unsyncedRefuelEvents = repository.getUnsyncedRefuelEvents()
             unsyncedRefuelEvents.forEach { event ->
-                val localId = event.id
-                val response = apiService.postRefuel(event.copy(id = 0))
-                if (response.isSuccessful && response.body() != null) {
-                    val serverEvent = response.body()!!
-                    val updatedEvent = event.copy(
-                        id = localId, // Keep local id
-                        isSynced = true
-                    )
-                    repository.updateRefuelEvent(updatedEvent)
+                if (event.id == null) { // New event, not yet on server
+                    val response = apiService.postRefuel(event)
+                    if (response.isSuccessful && response.body() != null) {
+                        val serverEvent = response.body()!!
+                        val updatedEvent = event.copy(
+                            id = serverEvent.id,
+                            isSynced = true
+                        )
+                        repository.updateRefuelEvent(updatedEvent)
+                    }
+                } else { // Existing event, needs update on server
+                    apiService.updateRefuel(event.id, event)
                 }
             }
 
-            // Loading events (assuming they are only created, not updated)
+            // Loading events
             val unsyncedLoadingEvents = repository.getUnsyncedLoadingEvents()
             unsyncedLoadingEvents.forEach { event ->
-                val localId = event.id
-                val response = apiService.postLoading(event.copy(id = 0))
-                if (response.isSuccessful && response.body() != null) {
-                    val serverEvent = response.body()!!
-                    val updatedEvent = event.copy(
-                        id = localId, // Keep local id
-                        isSynced = true
-                    )
-                    repository.updateLoadingEvent(updatedEvent)
+                if (event.id == null) { // New event, not yet on server
+                    val response = apiService.postLoading(event)
+                    if (response.isSuccessful && response.body() != null) {
+                        val serverEvent = response.body()!!
+                        val updatedEvent = event.copy(
+                            id = serverEvent.id,
+                            isSynced = true
+                        )
+                        repository.updateLoadingEvent(updatedEvent)
+                    }
+                } else { // Existing event, needs update on server
+                    apiService.updateLoading(event.id, event)
                 }
             }
 

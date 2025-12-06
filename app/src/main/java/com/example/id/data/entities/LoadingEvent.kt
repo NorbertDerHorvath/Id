@@ -9,7 +9,8 @@ import com.example.id.data.entities.User
 
 @Entity(tableName = "loading_events")
 data class LoadingEvent(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @PrimaryKey(autoGenerate = true) var localId: Long = 0,
+    @SerializedName("id") val id: Long? = null, // Server ID
     @SerializedName("userId") var userId: String,
     val startTime: Date?,
     val endTime: Date?,
