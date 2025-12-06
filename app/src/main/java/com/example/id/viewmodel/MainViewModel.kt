@@ -508,8 +508,12 @@ class MainViewModel @Inject constructor(
     }
 
     private fun triggerSync() {
-        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
-        workManager.enqueue(syncRequest)
+        viewModelScope.launch { 
+            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+            workManager.enqueue(syncRequest)
+            delay(1000)
+            observeUserData()
+        }
     }
 
     fun formatDuration(millis: Long): String {
