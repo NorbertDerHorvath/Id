@@ -22,7 +22,7 @@ interface WorkdayEventDao {
     fun getAllWorkdayEvents(userId: String): Flow<List<WorkdayEvent>>
 
     @Query("SELECT * FROM workday_events WHERE localId = :id")
-    suspend fun getWorkdayEventById(id: Long): WorkdayEvent?
+    suspend fun getWorkdayEventById(id: Long?): WorkdayEvent?
 
     @Query("SELECT * FROM workday_events WHERE endTime IS NULL ORDER BY startTime DESC LIMIT 1")
     fun getActiveWorkdayEvent(): Flow<WorkdayEvent?>
@@ -40,7 +40,7 @@ interface WorkdayEventDao {
     fun getWorkdayEventsForReport(userId: String, startDate: Date?, endDate: Date?): Flow<List<WorkdayEvent>>
 
     @Query("DELETE FROM workday_events WHERE localId = :id")
-    suspend fun deleteWorkdayEventById(id: Long)
+    suspend fun deleteWorkdayEventById(id: Long?)
 
     @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'" )
     fun getWorkdayEventsByPlate(userId: String, carPlate: String): Flow<List<WorkdayEvent>>

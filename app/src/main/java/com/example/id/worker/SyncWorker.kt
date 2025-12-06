@@ -32,25 +32,28 @@ class SyncWorker @AssistedInject constructor(
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
-                if (event.id == null) { // New event, not yet on server
+                if (event.id == null) { // New event, POST to server
                     val response = apiService.postWorkday(event)
                     if (response.isSuccessful && response.body() != null) {
                         val serverEvent = response.body()!!
                         val updatedEvent = event.copy(
-                            id = serverEvent.id,
+                            id = serverEvent.id, // Update with server ID
                             isSynced = true
                         )
                         repository.updateWorkdayEvent(updatedEvent)
                     }
-                } else { // Existing event, needs update on server
-                    apiService.updateWorkday(event.id, event)
+                } else { // Existing event, PUT update to server
+                    val response = apiService.updateWorkday(event.id, event)
+                    if (response.isSuccessful) {
+                        repository.updateWorkdayEvent(event.copy(isSynced = true))
+                    }
                 }
             }
 
             // Refuel events
             val unsyncedRefuelEvents = repository.getUnsyncedRefuelEvents()
             unsyncedRefuelEvents.forEach { event ->
-                if (event.id == null) { // New event, not yet on server
+                if (event.id == null) { // New event, POST to server
                     val response = apiService.postRefuel(event)
                     if (response.isSuccessful && response.body() != null) {
                         val serverEvent = response.body()!!
@@ -60,15 +63,18 @@ class SyncWorker @AssistedInject constructor(
                         )
                         repository.updateRefuelEvent(updatedEvent)
                     }
-                } else { // Existing event, needs update on server
-                    apiService.updateRefuel(event.id, event)
+                } else { // Existing event, PUT update to server
+                    val response = apiService.updateRefuel(event.id, event)
+                     if (response.isSuccessful) {
+                        repository.updateRefuelEvent(event.copy(isSynced = true))
+                    }
                 }
             }
 
             // Loading events
             val unsyncedLoadingEvents = repository.getUnsyncedLoadingEvents()
             unsyncedLoadingEvents.forEach { event ->
-                if (event.id == null) { // New event, not yet on server
+                if (event.id == null) { // New event, POST to server
                     val response = apiService.postLoading(event)
                     if (response.isSuccessful && response.body() != null) {
                         val serverEvent = response.body()!!
@@ -78,8 +84,11 @@ class SyncWorker @AssistedInject constructor(
                         )
                         repository.updateLoadingEvent(updatedEvent)
                     }
-                } else { // Existing event, needs update on server
-                    apiService.updateLoading(event.id, event)
+                } else { // Existing event, PUT update to server
+                    val response = apiService.updateLoading(event.id, event)
+                     if (response.isSuccessful) {
+                        repository.updateLoadingEvent(event.copy(isSynced = true))
+                    }
                 }
             }
 

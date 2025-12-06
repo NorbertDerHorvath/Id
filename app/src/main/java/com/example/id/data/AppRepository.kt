@@ -254,29 +254,32 @@ class AppRepository @Inject constructor(
 
         // 4. Sync unsynced local data
         getUnsyncedWorkdayEvents().forEach { event ->
-            val localId = event.id
-            val response = apiService.postWorkday(event.copy(id = 0))
-            if (response.isSuccessful && response.body() != null) {
-                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                replaceWorkdayEvent(localId, syncedEvent)
+            event.id?.let { localId ->
+                val response = apiService.postWorkday(event.copy(id = 0))
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                    replaceWorkdayEvent(localId, syncedEvent)
+                }
             }
         }
 
         getUnsyncedRefuelEvents().forEach { event ->
-            val localId = event.id
-            val response = apiService.postRefuel(event.copy(id = 0))
-            if (response.isSuccessful && response.body() != null) {
-                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                replaceRefuelEvent(localId, syncedEvent)
+            event.id?.let { localId ->
+                val response = apiService.postRefuel(event.copy(id = 0))
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                    replaceRefuelEvent(localId, syncedEvent)
+                }
             }
         }
 
         getUnsyncedLoadingEvents().forEach { event ->
-            val localId = event.id
-            val response = apiService.postLoading(event.copy(id = 0))
-            if (response.isSuccessful && response.body() != null) {
-                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                replaceLoadingEvent(localId, syncedEvent)
+            event.id?.let { localId ->
+                val response = apiService.postLoading(event.copy(id = 0))
+                if (response.isSuccessful && response.body() != null) {
+                    val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
+                    replaceLoadingEvent(localId, syncedEvent)
+                }
             }
         }
     }
