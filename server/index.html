@@ -11,6 +11,16 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         tr:nth-child(even) { background-color: #f9f9f9; }
+        .edit-btn, .delete-btn {
+            cursor: pointer;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            text-decoration: none;
+        }
+        .edit-btn { background-color: #4CAF50; }
+        .delete-btn { background-color: #f44336; }
     </style>
 </head>
 <body>
@@ -31,7 +41,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Function to fetch data and render a table
-            const fetchData = async (endpoint, elementId, columns) => {
+            const fetchData = async (endpoint, elementId, columns, isWorkday = false) => {
                 const targetElement = document.getElementById(elementId);
                 try {
                     const response = await fetch(`/api/${endpoint}`);
@@ -47,15 +57,45 @@
 
                     let table = '<table><thead><tr>';
                     columns.forEach(col => table += `<th>${col.header}</th>`);
+                    if (isWorkday) {
+                        table += '<th>Műveletek</th>';
+                    }
                     table += '</tr></thead><tbody>';
 
                     data.forEach(item => {
                         table += '<tr>';
                         columns.forEach(col => {
-                            // Access nested properties like 'User.username'
-                            let value = col.key.split('.').reduce((o, i) => o ? o[i] : '', item);
+                            let value;
+                            if (col.key === 'netWorkTime') {
+                                if (item.startTime && item.endTime) {
+                                    const start = new Date(item.startTime);
+                                    const end = new Date(item.endTime);
+                                    let diff = end - start;
+                                    const breakMinutes = item.breakTime || 0;
+                                    diff -= breakMinutes * 60 * 1000;
+                                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                    value = `${hours} óra ${minutes} perc`;
+                                } else {
+                                    value = 'N/A';
+                                }
+                            } else if (col.key === 'totalKm') {
+                                if (item.startOdometer && item.endOdometer) {
+                                    value = item.endOdometer - item.startOdometer;
+                                } else {
+                                    value = 'N/A';
+                                }
+                            } else {
+                                value = col.key.split('.').reduce((o, i) => o ? o[i] : '', item);
+                            }
                             table += `<td>${value || ''}</td>`;
                         });
+                        if (isWorkday) {
+                            table += `<td>
+                                        <button class="edit-btn" onclick="editWorkday(${item.id})">Szerkesztés</button>
+                                        <button class="delete-btn" onclick="deleteWorkday(${item.id})">Törlés</button>
+                                      </td>`;
+                        }
                         table += '</tr>';
                     });
 
@@ -85,12 +125,16 @@
 
             // Define columns for each table
             const workdayColumns = [
-                { header: 'Felhasználó', key: 'User.username' },
-                { header: 'Kezdés', key: 'startTime' },
-                { header: 'Vége', key: 'endTime' },
-                { header: 'Rendszám', key: 'carPlate' },
-                { header: 'Start KM', key: 'startOdometer' },
-                { header: 'End KM', key: 'endOdometer' },
+                { header: 'Felhasználó neve', key: 'User.username' },
+                { header: 'Munkaidő kezdete', key: 'startTime' },
+                { header: 'Városa', key: 'startLocation' },
+                { header: 'Munkaidő vége', key: 'endTime' },
+                { header: 'Városa', key: 'endLocation' },
+                { header: 'Összes netto munkaidő', key: 'netWorkTime' },
+                { header: 'Összes szünet', key: 'breakTime' },
+                { header: 'Kezdő km állás', key: 'startOdometer' },
+                { header: 'Záró km állás', key: 'endOdometer' },
+                { header: 'Összes megtett km', key: 'totalKm' },
             ];
 
             const refuelColumns = [
@@ -108,10 +152,30 @@
                 { header: 'Időpont', key: 'timestamp' },
                 { header: 'Leírás', key: 'description' },
             ];
+            
+            window.editWorkday = (id) => {
+                // Implement edit functionality, e.g., redirect to an edit page
+                console.log('Edit workday with id:', id);
+            };
+
+            window.deleteWorkday = (id) => {
+                // Implement delete functionality
+                if (confirm('Biztosan törölni szeretné ezt a munkanapot?')) {
+                    fetch(`/api/workday-events/${id}`, { method: 'DELETE' })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('A törlés nem sikerült.');
+                            }
+                            // Refresh the data after deletion
+                            fetchAllData();
+                        })
+                        .catch(error => console.error('Hiba a törlés közben:', error));
+                }
+            };
 
             const fetchAllData = () => {
                 fetchLastLogin();
-                fetchData('workday-events', 'workday-events', workdayColumns);
+                fetchData('workday-events', 'workday-events', workdayColumns, true);
                 fetchData('refuel-events', 'refuel-events', refuelColumns);
                 fetchData('loading-events', 'loading-events', loadingColumns);
             };

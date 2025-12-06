@@ -134,6 +134,21 @@ app.put('/api/workday-events/:id', authenticateToken, async (req, res) => {
     }
 });
 
+app.delete('/api/workday-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await WorkdayEvent.findByPk(req.params.id);
+        if (event) {
+            await event.destroy();
+            res.status(204).send();
+        } else {
+            res.status(404).json({ error: 'WorkdayEvent not found' });
+        }
+    } catch (error) {
+        console.error('Error deleting workday event:', error);
+        res.status(500).json({ error: 'Failed to delete workday event.' });
+    }
+});
+
 app.get('/api/workday-events', async (req, res) => {
   try {
     const events = await WorkdayEvent.findAll({ include: User });

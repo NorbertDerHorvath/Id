@@ -94,6 +94,9 @@ class MainViewModel @Inject constructor(
     private var activeWorkdayEvent: WorkdayEvent? = null
     private var activeBreakEvent: BreakEvent? = null
 
+    private val _recentWorkdays = MutableStateFlow<List<WorkdayEvent>>(emptyList())
+    val recentWorkdays: StateFlow<List<WorkdayEvent>> = _recentWorkdays.asStateFlow()
+
     init {
         initialize()
     }
@@ -154,6 +157,11 @@ class MainViewModel @Inject constructor(
             launch {
                 repository.getActiveLoadingEvent(currentUserId).collect { loadingEvent ->
                     _isloadingStarted.value = loadingEvent != null
+                }
+            }
+            launch {
+                repository.getAllWorkdayEvents(currentUserId).collect { workdays ->
+                    _recentWorkdays.value = workdays.sortedByDescending { it.startTime }
                 }
             }
 
@@ -289,7 +297,6 @@ class MainViewModel @Inject constructor(
                     _overtime.value = newCumulativeOvertime
                 }
 
-                loadRecentEvents()
                 triggerSync()
             }
         }
@@ -397,7 +404,6 @@ class MainViewModel @Inject constructor(
                 isSynced = false
             )
             repository.insertWorkdayEvent(newWorkday)
-            loadRecentEvents()
             triggerSync()
         }
     }
@@ -412,7 +418,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             repository.updateWorkdayEvent(event.copy(isSynced = false))
             clearEditingEvent()
-            loadRecentEvents()
             triggerSync()
         }
     }
@@ -427,7 +432,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             repository.updateLoadingEvent(event.copy(isSynced = false))
             clearEditingEvent()
-            loadRecentEvents()
             triggerSync()
         }
     }
@@ -442,31 +446,27 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             repository.updateRefuelEvent(event.copy(isSynced = false))
             clearEditingEvent()
-            loadRecentEvents()
             triggerSync()
         }
     }
 
-    fun deleteWorkdayEvent(id: Long) {
+    fun deleteWorkday(id: Long) {
         viewModelScope.launch {
-            repository.deleteWorkdayEvent(id)
-            loadRecentEvents()
+            repository.deleteWorkdayEventById(id)
             // TODO: Add deletion sync to server if needed
         }
     }
 
-    fun deleteRefuelEvent(id: Long) {
+    fun deleteRefuel(id: Long) {
         viewModelScope.launch {
-            repository.deleteRefuelEvent(id)
-            loadRecentEvents()
+            repository.deleteRefuelEventById(id)
             // TODO: Add deletion sync to server if needed
         }
     }
 
-    fun deleteLoadingEvent(id: Long) {
+    fun deleteLoading(id: Long) {
         viewModelScope.launch {
-            repository.deleteLoadingEvent(id)
-            loadRecentEvents()
+            repository.deleteLoadingEventById(id)
             // TODO: Add deletion sync to server if needed
         }
     }

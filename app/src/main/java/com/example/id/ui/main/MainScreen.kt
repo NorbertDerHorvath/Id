@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -40,13 +43,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.id.R
+import com.example.id.data.entities.WorkdayEvent
 import com.example.id.viewmodel.MainViewModel
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun MainScreen(
@@ -55,10 +63,10 @@ fun MainScreen(
 ) {
     val isWorkdayStarted by viewModel.isWorkdayStarted.collectAsState()
     val isBreakStarted by viewModel.isBreakStarted.collectAsState()
-    val isloadingStarted by viewModel.isloadingStarted.collectAsState()
     val workDuration by viewModel.workDuration.collectAsState()
     val breakDuration by viewModel.breakDuration.collectAsState()
     val overtime by viewModel.overtime.collectAsState()
+    val recentWorkdays by viewModel.recentWorkdays.collectAsState()
 
     var showStartOdometerDialog by remember { mutableStateOf(false) }
     var showEndOdometerDialog by remember { mutableStateOf(false) }
@@ -125,71 +133,147 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = stringResource(R.string.net_work_time),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.Black
-            )
-            Text(
-                text = viewModel.formatDuration(workDuration),
-                fontSize = 48.sp,
-                textAlign = TextAlign.Center,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.total_break_time),
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.Black
-            )
-            Text(
-                text = viewModel.formatDuration(breakDuration),
-                fontSize = 32.sp,
-                textAlign = TextAlign.Center,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "${stringResource(R.string.overtime)}: ${viewModel.formatDuration(overtime)}",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.Black
-            )
-            Spacer(modifier = Modifier.height(32.dp))
+            // Top controls and timers
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.net_work_time),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Black
+                )
+                Text(
+                    text = viewModel.formatDuration(workDuration),
+                    fontSize = 48.sp,
+                    textAlign = TextAlign.Center,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = stringResource(R.string.total_break_time),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Black
+                )
+                Text(
+                    text = viewModel.formatDuration(breakDuration),
+                    fontSize = 32.sp,
+                    textAlign = TextAlign.Center,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "${stringResource(R.string.overtime)}: ${viewModel.formatDuration(overtime)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Row {
-                Button(onClick = {
-                    if (isWorkdayStarted) {
-                        showEndOdometerDialog = true
-                    } else {
-                        showCarPlateDialog = true
+                Row {
+                    Button(onClick = {
+                        if (isWorkdayStarted) {
+                            showEndOdometerDialog = true
+                        } else {
+                            showCarPlateDialog = true
+                        }
+                    }) {
+                        Text(if (isWorkdayStarted) stringResource(R.string.end_workday) else stringResource(R.string.start_workday))
                     }
-                }) {
-                    Text(if (isWorkdayStarted) stringResource(R.string.end_workday) else stringResource(R.string.start_workday))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = { if (isBreakStarted) viewModel.endBreak() else viewModel.startBreak() }, enabled = isWorkdayStarted) {
+                        Text(if (isBreakStarted) stringResource(R.string.end_break) else stringResource(R.string.start_break))
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row {
+                    Button(onClick = { showRefuelDialog = true }, enabled = isWorkdayStarted) {
+                        Text(stringResource(R.string.record_refuel))
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Button(onClick = { navController.navigate("reports") }) {
+                    Text("Jelentések")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { viewModel.logout() }) {
+                    Text("Kijelentkezés")
+                }
+            }
+            
+            // Recent workdays list
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(recentWorkdays) { workday ->
+                    WorkdayListItem(
+                        workday = workday,
+                        onEdit = { /* TODO: Navigate to edit screen */ },
+                        onDelete = { viewModel.deleteWorkday(workday.localId) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WorkdayListItem(
+    workday: WorkdayEvent,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.getDefault())
+    val durationFormat: (Long) -> String = { millis ->
+        if (millis < 0) {
+            "00:00:00"
+        } else {
+            val hours = TimeUnit.MILLISECONDS.toHours(millis)
+            val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
+            val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
+            String.format("%02d:%02d:%02d", hours, minutes, seconds)
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Felhasználó: ${workday.userId}", fontWeight = FontWeight.Bold)
+            Text("Munkaidő kezdete: ${dateFormat.format(workday.startTime)}")
+            workday.endTime?.let { Text("Munkaidő vége: ${dateFormat.format(it)}") }
+            Text("Város: ${workday.startLocation ?: "N/A"}")
+            Text("Induló km: ${workday.startOdometer ?: "N/A"}")
+            workday.endOdometer?.let { Text("Záró km: $it") }
+
+            val netWorkTimeMillis = workday.endTime?.let {
+                val totalDuration = it.time - workday.startTime.time
+                val breakMillis = workday.breakTime * 60 * 1000L
+                totalDuration - breakMillis
+            }
+
+            Text("Összes szünet: ${workday.breakTime} perc")
+            netWorkTimeMillis?.let { Text("Nettó munkaidő: ${durationFormat(it)}") }
+
+            val drivenKm = workday.endOdometer?.let { endOdo ->
+                workday.startOdometer?.let { startOdo ->
+                    endOdo - startOdo
+                }
+            }
+            drivenKm?.let { Text("Megtett km: $it") }
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onEdit) {
+                    Text("Szerkesztés")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { if (isBreakStarted) viewModel.endBreak() else viewModel.startBreak() }, enabled = isWorkdayStarted) {
-                    Text(if (isBreakStarted) stringResource(R.string.end_break) else stringResource(R.string.start_break))
+                Button(onClick = onDelete) {
+                    Text("Törlés")
                 }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row {
-                Button(onClick = { showRefuelDialog = true }, enabled = isWorkdayStarted) {
-                    Text(stringResource(R.string.record_refuel))
-                }
-            }
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            Button(onClick = { navController.navigate("reports") }) {
-                Text("Jelentések")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { viewModel.logout() }) {
-                Text("Kijelentkezés")
             }
         }
     }
@@ -243,7 +327,7 @@ fun OdometerDialog(title: String, onDismiss: () -> Unit, onConfirm: (odometer: I
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(odometer.toInt()) }) {
+            TextButton(onClick = { odometer.toIntOrNull()?.let(onConfirm) }) {
                 Text(stringResource(R.string.save))
             }
         },
@@ -366,7 +450,15 @@ fun RefuelDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(odometer.toInt(), fuelType, fuelAmount.toDouble(), paymentMethod, carPlate) }) {
+            TextButton(onClick = {
+                onConfirm(
+                    odometer.toIntOrNull() ?: 0,
+                    fuelType,
+                    fuelAmount.toDoubleOrNull() ?: 0.0,
+                    paymentMethod,
+                    carPlate
+                )
+            }) {
                 Text(stringResource(R.string.save))
             }
         },

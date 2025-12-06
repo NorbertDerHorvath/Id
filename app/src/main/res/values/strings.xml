@@ -151,6 +151,9 @@
     <string name="car_plate_label">Rendszám:</string>
     <string name="start_odometer_label">Kezdő km:</string>
     <string name="end_odometer_label">Záró km:</string>
+    <string name="user_name_label">Felhasználó:</string>
+    <string name="net_work_time_label">Nettó munkaidő:</string>
+    <string name="total_km_label">Összes km:</string>
     <plurals name="days_plural">
         <item quantity="one">%d nap</item>
         <item quantity="other">%d nap</item>

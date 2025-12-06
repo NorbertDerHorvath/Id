@@ -18,6 +18,10 @@ const WorkdayEvent = sequelize.define('WorkdayEvent', {
   endTime: {
     type: DataTypes.DATE,
   },
+  breakTime: {
+    type: DataTypes.INTEGER, // Break time in minutes
+    defaultValue: 0,
+  },
   startLocation: {
     type: DataTypes.STRING,
   },

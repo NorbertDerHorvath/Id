@@ -32,20 +32,22 @@ class SyncWorker @AssistedInject constructor(
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
-                if (event.id == null) { // New event, POST to server
-                    val response = apiService.postWorkday(event)
-                    if (response.isSuccessful && response.body() != null) {
-                        val serverEvent = response.body()!!
-                        val updatedEvent = event.copy(
-                            id = serverEvent.id, // Update with server ID
-                            isSynced = true
-                        )
-                        repository.updateWorkdayEvent(updatedEvent)
-                    }
-                } else { // Existing event, PUT update to server
-                    val response = apiService.updateWorkday(event.id, event)
-                    if (response.isSuccessful) {
-                        repository.updateWorkdayEvent(event.copy(isSynced = true))
+                if (event.endTime != null) { // Only sync finished workday events
+                    if (event.id == null) { // New event, POST to server
+                        val response = apiService.postWorkday(event)
+                        if (response.isSuccessful && response.body() != null) {
+                            val serverEvent = response.body()!!
+                            val updatedEvent = event.copy(
+                                id = serverEvent.id, // Update with server ID
+                                isSynced = true
+                            )
+                            repository.updateWorkdayEvent(updatedEvent)
+                        }
+                    } else { // Existing event, PUT update to server
+                        val response = apiService.updateWorkday(event.id, event)
+                        if (response.isSuccessful) {
+                            repository.updateWorkdayEvent(event.copy(isSynced = true))
+                        }
                     }
                 }
             }
@@ -74,20 +76,22 @@ class SyncWorker @AssistedInject constructor(
             // Loading events
             val unsyncedLoadingEvents = repository.getUnsyncedLoadingEvents()
             unsyncedLoadingEvents.forEach { event ->
-                if (event.id == null) { // New event, POST to server
-                    val response = apiService.postLoading(event)
-                    if (response.isSuccessful && response.body() != null) {
-                        val serverEvent = response.body()!!
-                        val updatedEvent = event.copy(
-                            id = serverEvent.id,
-                            isSynced = true
-                        )
-                        repository.updateLoadingEvent(updatedEvent)
-                    }
-                } else { // Existing event, PUT update to server
-                    val response = apiService.updateLoading(event.id, event)
-                     if (response.isSuccessful) {
-                        repository.updateLoadingEvent(event.copy(isSynced = true))
+                 if (event.endTime != null) { // Only sync finished loading events
+                    if (event.id == null) { // New event, POST to server
+                        val response = apiService.postLoading(event)
+                        if (response.isSuccessful && response.body() != null) {
+                            val serverEvent = response.body()!!
+                            val updatedEvent = event.copy(
+                                id = serverEvent.id,
+                                isSynced = true
+                            )
+                            repository.updateLoadingEvent(updatedEvent)
+                        }
+                    } else { // Existing event, PUT update to server
+                        val response = apiService.updateLoading(event.id, event)
+                        if (response.isSuccessful) {
+                            repository.updateLoadingEvent(event.copy(isSynced = true))
+                        }
                     }
                 }
             }

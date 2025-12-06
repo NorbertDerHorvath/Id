@@ -35,6 +35,7 @@ import com.example.id.data.entities.WorkdayEvent
 import com.example.id.viewmodel.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun ManualDataEntryScreen(navController: NavController, viewModel: MainViewModel) {
@@ -89,6 +90,7 @@ fun ManualDataEntryScreen(navController: NavController, viewModel: MainViewModel
 fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel: MainViewModel) {
     val dateTimeFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.GERMAN) }
     val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd", Locale.GERMAN) }
+
     Card(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray)) {
         Column(modifier = Modifier.padding(8.dp)) {
             val title = when (event.type) {
@@ -100,14 +102,31 @@ fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel
 
             when (event.type) {
                 EventType.WORK -> {
-                    Text("${stringResource(R.string.start_time_label)} ${dateTimeFormat.format(event.startTime)}")
-                    event.endTime?.let { Text("${stringResource(R.string.end_time_label)} ${dateTimeFormat.format(it)}") }
-                    Text("${stringResource(R.string.car_plate_label)} ${event.carPlate}")
-                    Text("${stringResource(R.string.start_odometer_label)} ${event.startOdometer}")
-                    event.endOdometer?.let { Text("${stringResource(R.string.end_odometer_label)} $it") }
+                    val totalKm = if (event.endOdometer != null && event.startOdometer != null) {
+                        event.endOdometer - event.startOdometer
+                    } else {
+                        0
+                    }
+                    val netWorkTime = if (event.endTime != null) {
+                        val diff = event.endTime.time - event.startTime.time
+                        val hours = TimeUnit.MILLISECONDS.toHours(diff)
+                        val minutes = TimeUnit.MILLISECONDS.toMinutes(diff) % 60
+                        String.format("%02d:%02d", hours, minutes)
+                    } else {
+                        "N/A"
+                    }
+
+                    Text("${stringResource(R.string.user_name_label)} ${event.user?.username ?: event.userId}")
+                    Text("${stringResource(R.string.start_time_label)} ${dateTimeFormat.format(event.startTime)} - ${event.startLocation}")
+                    event.endTime?.let { Text("${stringResource(R.string.end_time_label)} ${dateTimeFormat.format(it)} - ${event.endLocation}") }
+                    Text("${stringResource(R.string.net_work_time_label)} $netWorkTime")
                     if (event.breakTime > 0) {
                         Text("${stringResource(R.string.break_time_label)} ${event.breakTime} ${stringResource(R.string.break_time_unit)}")
                     }
+                    Text("${stringResource(R.string.start_odometer_label)} ${event.startOdometer}")
+                    event.endOdometer?.let { Text("${stringResource(R.string.end_odometer_label)} $it") }
+                    Text("${stringResource(R.string.total_km_label)} $totalKm km")
+
                 }
                 EventType.VACATION, EventType.SICK_LEAVE -> {
                     Text("${stringResource(R.string.start_time_label)} ${dateFormat.format(event.startTime)}")
@@ -115,10 +134,10 @@ fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel
                 }
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_workday/${event.id!!}") }) {
+                TextButton(onClick = { navController.navigate("edit_workday/${event.localId}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteWorkdayEvent(event.id!!) }) {
+                TextButton(onClick = { viewModel.deleteWorkday(event.localId) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }
@@ -135,10 +154,10 @@ fun RefuelItemCard(navController: NavController, event: RefuelEvent, viewModel: 
             Text("${stringResource(R.string.date_time_label)} ${dateFormat.format(event.timestamp)}")
             Text("${event.fuelAmount}L ${event.fuelType} - ${event.carPlate}")
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_refuel/${event.id!!}") }) {
+                TextButton(onClick = { navController.navigate("edit_refuel/${event.localId}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteRefuelEvent(event.id!!) }) {
+                TextButton(onClick = { viewModel.deleteRefuel(event.localId) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }
@@ -155,10 +174,10 @@ fun LoadingItemCard(navController: NavController, event: LoadingEvent, viewModel
             event.startTime?.let { Text("${stringResource(R.string.start_time_label)} ${dateFormat.format(it)}") }
             event.endTime?.let { Text("${stringResource(R.string.end_time_label)} ${dateFormat.format(it)}") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { navController.navigate("edit_loading/${event.id!!}") }) {
+                TextButton(onClick = { navController.navigate("edit_loading/${event.localId}") }) {
                     Text(stringResource(id = R.string.edit))
                 }
-                TextButton(onClick = { viewModel.deleteLoadingEvent(event.id!!) }) {
+                TextButton(onClick = { viewModel.deleteLoading(event.localId) }) {
                     Text(stringResource(id = R.string.delete), color = Color.Red)
                 }
             }
