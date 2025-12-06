@@ -35,7 +35,6 @@ app.get('/api/create-test-user', async (req, res) => {
 
     // Create the new test user, referencing the company's actual ID
     const user = await User.create({
-      id: 'af0c84e6-d8ca-49ad-990a-6fba53bbada6', // Hardcoded UUID for stable testing
       username: 'norbi',
       password: 'norbi', // The beforeCreate hook will hash this
       role: 'driver',
@@ -72,7 +71,7 @@ app.post('/api/login', async (req, res) => {
     user.lastLoginLocation = req.ip;
     await user.save();
 
-    res.json({ message: 'Login successful', token, username: user.username, userId: user.id });
+    res.json({ message: 'Login successful', token, username: user.username });
 
   } catch (error) {
     console.error('Login error:', error);
@@ -243,7 +242,6 @@ app.listen(PORT, async () => {
     await User.findOrCreate({
       where: { username: 'norbi' },
       defaults: {
-        id: 'af0c84e6-d8ca-49ad-990a-6fba53bbada6', // Hardcoded UUID for stable testing
         password: 'norbi',
         role: 'driver',
         companyId: company.id,

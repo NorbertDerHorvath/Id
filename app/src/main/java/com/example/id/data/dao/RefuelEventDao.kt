@@ -54,7 +54,7 @@ interface RefuelEventDao {
     @Transaction
     suspend fun replaceRefuelEvent(oldId: Long, newEvent: RefuelEvent) {
         deleteRefuelEventById(oldId)
-        insertRefuelEvents(listOf(newEvent))
+        insertRefuelEvent(newEvent.copy(id = 0))
     }
 
     @Query("DELETE FROM refuel_events WHERE isSynced = 1")

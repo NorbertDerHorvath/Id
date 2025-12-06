@@ -57,7 +57,7 @@ interface WorkdayEventDao {
     @Transaction
     suspend fun replaceWorkdayEvent(oldId: Long, newEvent: WorkdayEvent) {
         deleteWorkdayEventById(oldId)
-        insertWorkdayEvents(listOf(newEvent))
+        insertWorkdayEvent(newEvent.copy(id = 0))
     }
 
     @Query("DELETE FROM workday_events WHERE isSynced = 1")

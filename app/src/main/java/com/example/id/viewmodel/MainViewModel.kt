@@ -178,9 +178,8 @@ class MainViewModel @Inject constructor(
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
                     prefs.edit().putString(USER_NAME_KEY, username).apply()
-                    syncData()
-                    initialize()
-                    _loginState.value = LoginUiState.Success
+                    initialize() // Re-initialize after login
+                    triggerSync()
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Unknown login error"
                     _loginState.value = LoginUiState.Error(errorBody)
@@ -510,10 +509,6 @@ class MainViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    private suspend fun syncData() {
-        repository.syncData()
     }
 
     private fun triggerSync() {

@@ -54,7 +54,7 @@ interface LoadingEventDao {
     @Transaction
     suspend fun replaceLoadingEvent(oldId: Long, newEvent: LoadingEvent) {
         deleteLoadingEventById(oldId)
-        insertLoadingEvents(listOf(newEvent))
+        insertLoadingEvent(newEvent)
     }
 
     @Query("DELETE FROM loading_events WHERE isSynced = 1")
