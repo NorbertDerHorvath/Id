@@ -30,6 +30,9 @@ const RefuelEvent = sequelize.define('RefuelEvent', {
   location: {
     type: DataTypes.STRING,
   },
+  value: {
+    type: DataTypes.DOUBLE,
+  },
 });
 
 module.exports = RefuelEvent;

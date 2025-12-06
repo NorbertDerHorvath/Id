@@ -28,7 +28,7 @@ import com.example.id.R
 @Composable
 fun RefuelDialog(
     onDismiss: () -> Unit,
-    onConfirm: (odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) -> Unit,
+    onConfirm: (odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String, value: Double?) -> Unit,
     currentCarPlate: String?
 ) {
     val dieselStr = stringResource(R.string.fuel_type_diesel)
@@ -40,6 +40,7 @@ fun RefuelDialog(
     var odometer by remember { mutableStateOf("") }
     var fuelType by remember { mutableStateOf(dieselStr) }
     var fuelAmount by remember { mutableStateOf("") }
+    var value by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf(chipStr) }
     var carPlate by remember { mutableStateOf(currentCarPlate ?: "") }
 
@@ -99,6 +100,14 @@ fun RefuelDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text(stringResource(R.string.value_in_huf), color = Color.Black) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
                 ExposedDropdownMenuBox(
                     expanded = paymentMethodExpanded,
                     onExpandedChange = { paymentMethodExpanded = !paymentMethodExpanded }
@@ -135,7 +144,7 @@ fun RefuelDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(odometer.toInt(), fuelType, fuelAmount.toDouble(), paymentMethod, carPlate) }) {
+            TextButton(onClick = { onConfirm(odometer.toInt(), fuelType, fuelAmount.toDouble(), paymentMethod, carPlate, value.toDoubleOrNull()) }) {
                 Text(stringResource(R.string.save))
             }
         },

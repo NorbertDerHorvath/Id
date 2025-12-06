@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tankolás szerkesztése</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        form { display: flex; flex-direction: column; max-width: 500px; }
+        label { margin-top: 10px; }
+        input, select { padding: 8px; margin-top: 5px; }
+        button { margin-top: 20px; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #message { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <h1>Tankolás szerkesztése</h1>
+    <form id="edit-refuel-form">
+        <label for="timestamp">Időpont</label>
+        <input type="datetime-local" id="timestamp" name="timestamp">
+
+        <label for="odometer">KM állás</label>
+        <input type="number" id="odometer" name="odometer">
+
+        <label for="fuelType">Üzemanyag</label>
+        <input type="text" id="fuelType" name="fuelType">
+
+        <label for="fuelAmount">Mennyiség (liter)</label>
+        <input type="number" step="0.01" id="fuelAmount" name="fuelAmount">
+
+        <label for="value">Érték (Ft)</label>
+        <input type="number" step="0.01" id="value" name="value">
+
+        <label for="paymentMethod">Fizetési mód</label>
+        <input type="text" id="paymentMethod" name="paymentMethod">
+
+        <label for="carPlate">Rendszám</label>
+        <input type="text" id="carPlate" name="carPlate">
+
+        <button type="submit">Mentés</button>
+    </form>
+    <div id="message"></div>
+    <a href="/">Vissza a főoldalra</a>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const id = urlParams.get('id');
+            const form = document.getElementById('edit-refuel-form');
+            const messageDiv = document.getElementById('message');
+
+            if (!id) {
+                messageDiv.innerHTML = '<p style="color: red;">Nincs ID megadva.</p>';
+                return;
+            }
+
+            // Fetch existing data
+            try {
+                const response = await fetch(`/api/refuel-events/${id}`);
+                if (!response.ok) throw new Error('Nem sikerült betölteni az adatokat.');
+                const event = await response.json();
+
+                // Populate form
+                document.getElementById('timestamp').value = event.timestamp.slice(0, 16);
+                document.getElementById('odometer').value = event.odometer;
+                document.getElementById('fuelType').value = event.fuelType;
+                document.getElementById('fuelAmount').value = event.fuelAmount;
+                document.getElementById('value').value = event.value;
+                document.getElementById('paymentMethod').value = event.paymentMethod;
+                document.getElementById('carPlate').value = event.carPlate;
+
+            } catch (error) {
+                messageDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+            }
+
+            // Handle form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                
+                // Convert to correct types
+                data.odometer = parseInt(data.odometer, 10);
+                data.fuelAmount = parseFloat(data.fuelAmount);
+                data.value = parseFloat(data.value);
+
+                try {
+                    const response = await fetch(`/api/refuel-events/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    if (!response.ok) throw new Error('A mentés nem sikerült.');
+                    messageDiv.innerHTML = '<p style="color: green;">Sikeresen mentve!</p>';
+                    setTimeout(() => window.location.href = '/', 1000);
+                } catch (error) {
+                    messageDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

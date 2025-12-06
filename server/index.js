@@ -22,6 +22,10 @@ app.get('/edit_workday.html', (req, res) => {
   res.sendFile(__dirname + '/edit_workday.html');
 });
 
+app.get('/edit_refuel.html', (req, res) => {
+  res.sendFile(__dirname + '/edit_refuel.html');
+});
+
 
 // --- Public API Routes ---
 
@@ -163,6 +167,19 @@ app.get('/api/refuel-events', async (req, res) => {
   }
 });
 
+app.get('/api/refuel-events/:id', async (req, res) => {
+    try {
+        const event = await RefuelEvent.findByPk(req.params.id, { include: User });
+        if (event) {
+            res.json(event);
+        } else {
+            res.status(404).json({ error: 'RefuelEvent not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch refuel event.' });
+    }
+});
+
 app.post('/api/refuel-events', authenticateToken, async (req, res) => {
     try {
         const { ...eventData } = req.body;
@@ -175,14 +192,10 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
     }
 });
 
-app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+app.put('/api/refuel-events/:id', async (req, res) => {
     try {
         const event = await RefuelEvent.findByPk(req.params.id);
         if (event) {
-            // Ensure the user is updating their own event or is an admin
-            if (event.userId !== req.user.userId && req.user.role !== 'admin') {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
             const { id, ...eventData } = req.body;
             await event.update(eventData);
             const updatedEvent = await RefuelEvent.findByPk(req.params.id, { include: User });
@@ -193,6 +206,20 @@ app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error("Error updating refuel event:", error);
         res.status(500).json({ error: 'Failed to update refuel event.' });
+    }
+});
+
+app.delete('/api/refuel-events/:id', async (req, res) => {
+    try {
+        const event = await RefuelEvent.findByPk(req.params.id);
+        if (event) {
+            await event.destroy();
+            res.status(204).send();
+        } else {
+            res.status(404).json({ error: 'RefuelEvent not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete refuel event.' });
     }
 });
 

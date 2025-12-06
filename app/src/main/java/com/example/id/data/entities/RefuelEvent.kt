@@ -21,6 +21,7 @@ data class RefuelEvent(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val location: String? = null,
+    val value: Double? = null,
     var isSynced: Boolean = false
 ) {
     @Ignore

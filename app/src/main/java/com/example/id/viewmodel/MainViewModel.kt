@@ -322,7 +322,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun recordRefuel(odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String) {
+    fun recordRefuel(odometer: Int, fuelType: String, fuelAmount: Double, paymentMethod: String, carPlate: String, value: Double?) {
         viewModelScope.launch {
             val location = getCurrentLocation()
             val address = getAddressFromLocation(application, location)
@@ -337,6 +337,7 @@ class MainViewModel @Inject constructor(
                 latitude = location?.latitude,
                 longitude = location?.longitude,
                 carPlate = carPlate,
+                value = value,
                 isSynced = false
             )
             repository.insertRefuelEvent(refuel)

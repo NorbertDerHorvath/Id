@@ -22,6 +22,7 @@
         }
         .edit-btn { background-color: #4CAF50; }
         .delete-btn { background-color: #f44336; }
+        .nowrap { white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -48,7 +49,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const fetchData = async (endpoint, elementId, columns, isWorkday = false) => {
+            const fetchData = async (endpoint, elementId, columns, actions = null) => {
                 const targetElement = document.getElementById(elementId);
                 try {
                     const response = await fetch(`/api/${endpoint}`);
@@ -62,7 +63,7 @@
 
                     let table = '<table><thead><tr>';
                     columns.forEach(col => table += `<th>${col.header}</th>`);
-                    if (isWorkday) table += '<th>Műveletek</th>';
+                    if (actions) table += '<th>Műveletek</th>';
                     table += '</tr></thead><tbody>';
 
                     data.forEach(item => {
@@ -98,12 +99,13 @@
                             } else {
                                 value = col.key.split('.').reduce((o, i) => o ? o[i] : '', item);
                             }
-                            table += `<td>${value || ''}</td>`;
+                            const className = col.className ? ` class="${col.className}"` : '';
+                            table += `<td${className}>${value || ''}</td>`;
                         });
-                        if (isWorkday) {
+                        if (actions) {
                             table += `<td>
-                                        <button class="edit-btn" onclick="editWorkday(${item.id})">Szerkesztés</button>
-                                        <button class="delete-btn" onclick="deleteWorkday(${item.id})">Törlés</button>
+                                        <button class="edit-btn" onclick="${actions.edit}('${item.id}')">Szerkesztés</button>
+                                        <button class="delete-btn" onclick="${actions.delete}('${item.id}')">Törlés</button>
                                       </td>`;
                         }
                         table += '</tr>';
@@ -119,7 +121,7 @@
 
             const workdayColumns = [
                 { header: 'Felhasználó', key: 'User.username' },
-                { header: 'Rendszám', key: 'carPlate' },
+                { header: 'Rendszám', key: 'carPlate', className: 'nowrap' },
                 { header: 'Munkaidő kezdete', key: 'startTime' },
                 { header: 'Városa', key: 'startLocation' },
                 { header: 'Munkaidő vége', key: 'endTime' },
@@ -137,8 +139,9 @@
                 { header: 'KM állás', key: 'odometer' },
                 { header: 'Üzemanyag', key: 'fuelType' },
                 { header: 'Mennyiség', key: 'fuelAmount' },
+                { header: 'Érték', key: 'value' },
                 { header: 'Fizetési mód', key: 'paymentMethod' },
-                { header: 'Rendszám', key: 'carPlate' },
+                { header: 'Rendszám', key: 'carPlate', className: 'nowrap' },
             ];
             
             window.editWorkday = (id) => {
@@ -158,9 +161,26 @@
                 }
             };
 
+            window.editRefuel = (id) => {
+                window.location.href = `/edit_refuel.html?id=${id}`;
+            };
+
+            window.deleteRefuel = async (id) => {
+                if (confirm('Biztosan törölni szeretné ezt a tankolást?')) {
+                    try {
+                        const response = await fetch(`/api/refuel-events/${id}`, { method: 'DELETE' });
+                        if (!response.ok) throw new Error('A törlés nem sikerült.');
+                        fetchAllData(); // Refresh data
+                    } catch(error) {
+                        alert(error.message);
+                        console.error('Hiba a törlés közben:', error);
+                    }
+                }
+            };
+
             const fetchAllData = () => {
-                fetchData('workday-events', 'workday-events', workdayColumns, true);
-                fetchData('refuel-events', 'refuel-events', refuelColumns);
+                fetchData('workday-events', 'workday-events', workdayColumns, { edit: 'editWorkday', delete: 'deleteWorkday' });
+                fetchData('refuel-events', 'refuel-events', refuelColumns, { edit: 'editRefuel', delete: 'deleteRefuel' });
             };
 
             fetchAllData();
