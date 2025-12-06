@@ -182,10 +182,10 @@ app.listen(PORT, async () => {
   try {
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ alter: true }); 
     console.log('All models were synchronized successfully.');
 
-    // Create a default user to ensure it exists after sync/force
+    // Create a default user to ensure it exists after sync/alter
     const [company] = await Company.findOrCreate({
       where: { name: 'Test Company' },
       defaults: { adminEmail: 'admin@test.com' },
