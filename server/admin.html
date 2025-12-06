@@ -61,16 +61,16 @@
                             <label for="password">Password (leave blank to keep current)</label>
                             <input type="password" class="form-control" id="password">
                         </div>
-                        <div class="form-group" id="role-group">
+                        <div class="form-group" id="role-group" style="display: none;">
                             <label for="role">Role</label>
                             <select class="form-control" id="role">
                                 <option value="user">User</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
-                         <div class="form-group" id="company-group">
-                            <label for="companyId">Company ID (for new Admins)</label>
-                            <input type="text" class="form-control" id="companyId">
+                         <div class="form-group" id="company-name-group" style="display: none;">
+                            <label for="companyName">Company Name (for new Admins)</label>
+                            <input type="text" class="form-control" id="companyName">
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -87,7 +87,7 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         const token = localStorage.getItem('token');
-        const userRole = parseJwt(token).role;
+        let currentUserRole = null;
 
         function parseJwt(token) {
             try {
@@ -99,15 +99,29 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             if (!token) {
-                window.location.href = '/';
+                window.location.href = '/login.html';
                 return;
             }
+            const decodedToken = parseJwt(token);
+            if (!decodedToken) {
+                window.location.href = '/login.html';
+                return;
+            }
+            currentUserRole = decodedToken.role;
+
             loadUsers();
             
-            if (userRole !== 'superadmin') {
-                document.getElementById('role-group').style.display = 'none';
-                document.getElementById('company-group').style.display = 'none';
+            if (currentUserRole === 'superadmin') {
+                document.getElementById('role-group').style.display = 'block';
             }
+
+            document.getElementById('role').addEventListener('change', function() {
+                if (this.value === 'admin' && currentUserRole === 'superadmin') {
+                    document.getElementById('company-name-group').style.display = 'block';
+                } else {
+                    document.getElementById('company-name-group').style.display = 'none';
+                }
+            });
         });
 
         async function loadUsers() {
@@ -124,7 +138,7 @@
                             <td>${user.realName || 'N/A'}</td>
                             <td>${user.role}</td>
                             <td>${user.Company ? user.Company.name : 'N/A'}</td>
-                            <td><button class="btn btn-sm btn-info" onclick='prepareEditUserModal("${user.id}")'>Edit</button></td>
+                            <td><button class="btn btn-sm btn-info" onclick='prepareEditUserModal(${JSON.stringify(user)})'>Edit</button></td>
                         </tr>
                     `;
                 });
@@ -136,25 +150,36 @@
         function prepareNewUserModal() {
             document.getElementById('user-form').reset();
             document.getElementById('userId').value = '';
-             document.getElementById('username').readOnly = false;
+            document.getElementById('username').readOnly = false;
+            document.getElementById('company-name-group').style.display = 'none'; // Hide by default
+            if(currentUserRole === 'superadmin'){
+                 document.getElementById('role-group').style.display = 'block';
+            }
             $('#userModal').modal('show');
         }
 
-        async function prepareEditUserModal(userId) {
-            const response = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
-            const users = await response.json();
-            const user = users.find(u => u.id === userId);
-            if(user) {
-                document.getElementById('userId').value = user.id;
-                document.getElementById('username').value = user.username;
-                document.getElementById('username').readOnly = true; 
-                document.getElementById('realName').value = user.realName || '';
-                document.getElementById('role').value = user.role;
-                if(user.role === 'admin') {
-                    document.getElementById('companyId').value = user.companyId || '';
-                }
-                $('#userModal').modal('show');
+        function prepareEditUserModal(user) {
+            document.getElementById('user-form').reset();
+            document.getElementById('userId').value = user.id;
+            document.getElementById('username').value = user.username;
+            document.getElementById('username').readOnly = true; 
+            document.getElementById('realName').value = user.realName || '';
+            document.getElementById('role').value = user.role;
+
+            if (currentUserRole === 'superadmin') {
+                 document.getElementById('role-group').style.display = 'block';
+                 if(user.role === 'admin'){
+                     document.getElementById('company-name-group').style.display = 'block';
+                     document.getElementById('companyName').value = user.Company ? user.Company.name : '';
+                 } else {
+                    document.getElementById('company-name-group').style.display = 'none';
+                 }
+            } else {
+                document.getElementById('role-group').style.display = 'none';
+                document.getElementById('company-name-group').style.display = 'none';
             }
+            
+            $('#userModal').modal('show');
         }
 
         document.getElementById('user-form').addEventListener('submit', async function(e) {
@@ -168,10 +193,16 @@
                 realName: document.getElementById('realName').value,
                 password: document.getElementById('password').value,
                 role: document.getElementById('role').value,
-                companyId: document.getElementById('companyId').value || null
+                companyName: document.getElementById('companyName').value || null
             };
 
-            if (!body.password) delete body.password; // Don't send empty password
+            if (!body.password) delete body.password;
+            if (currentUserRole !== 'superadmin') {
+                 delete body.role; 
+                 delete body.companyName;
+            } else if (body.role !== 'admin') {
+                 delete body.companyName;
+            }
 
             try {
                 const response = await fetch(url, {
@@ -195,7 +226,7 @@
                 .finally(() => {
                     localStorage.removeItem('token');
                     localStorage.removeItem('username');
-                    window.location.href = '/';
+                    window.location.href = '/login.html';
                 });
             });
 
