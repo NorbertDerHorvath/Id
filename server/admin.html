@@ -135,11 +135,14 @@
             document.getElementById('username').readOnly = false;
             document.getElementById('company-name-group').style.display = 'none';
             document.getElementById('superadmin-role-option').style.display = 'none';
+            document.getElementById('role-group').style.display = 'block'; // Show role dropdown for all admins
 
             if (currentUserRole === 'superadmin') {
                 document.getElementById('superadmin-role-option').style.display = 'block';
                 document.getElementById('company-name-group').style.display = 'block';
-            } 
+            } else {
+                document.getElementById('role').value = 'user'; // Admins default to creating users
+            }
             
             $('#userModal').modal('show');
         }
@@ -152,6 +155,7 @@
             document.getElementById('realName').value = user.realName || '';
             document.getElementById('role').value = user.role;
             
+            document.getElementById('role-group').style.display = 'block';
             document.getElementById('superadmin-role-option').style.display = 'none';
             document.getElementById('company-name-group').style.display = 'none';
 
