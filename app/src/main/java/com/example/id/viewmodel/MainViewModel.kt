@@ -135,23 +135,27 @@ class MainViewModel @Inject constructor(
             }
 
             // Observe active workday, break and loading events
-            combine(
-                repository.getActiveWorkdayEvent(currentUserId),
-                repository.getActiveBreakEvent(currentUserId),
-                repository.getActiveLoadingEvent(currentUserId)
-            ) { workday, breakEvent, loadingEvent ->
-                activeWorkdayEvent = workday
-                _isWorkdayStarted.value = workday != null && workday.endTime == null
+            launch {
+                repository.getActiveWorkdayEvent(currentUserId).collect { workday ->
+                    activeWorkdayEvent = workday
+                    _isWorkdayStarted.value = workday != null && workday.endTime == null
 
-                activeBreakEvent = breakEvent
-                _isBreakStarted.value = breakEvent != null && breakEvent.endTime == null
-
-                _isloadingStarted.value = loadingEvent != null
-
-                if (workday == null || workday.endTime != null) {
-                    updateDurations()
+                    if (workday == null || workday.endTime != null) {
+                        updateDurations()
+                    }
                 }
-            }.collect {}
+            }
+            launch {
+                repository.getActiveBreakEvent(currentUserId).collect { breakEvent ->
+                    activeBreakEvent = breakEvent
+                    _isBreakStarted.value = breakEvent != null && breakEvent.endTime == null
+                }
+            }
+            launch {
+                repository.getActiveLoadingEvent(currentUserId).collect { loadingEvent ->
+                    _isloadingStarted.value = loadingEvent != null
+                }
+            }
 
             // Timer to update durations every second
             launch {
@@ -508,12 +512,8 @@ class MainViewModel @Inject constructor(
     }
 
     private fun triggerSync() {
-        viewModelScope.launch { 
-            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
-            workManager.enqueue(syncRequest)
-            delay(1000)
-            observeUserData()
-        }
+        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
+        workManager.enqueue(syncRequest)
     }
 
     fun formatDuration(millis: Long): String {

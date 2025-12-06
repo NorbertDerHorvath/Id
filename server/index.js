@@ -105,7 +105,7 @@ app.get('/api/last-login', async (req, res) => {
 // Workday Events
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
   try {
-    const { id, ...eventData } = req.body; // Destructure to remove id
+    const { id, role, ...eventData } = req.body; // Destructure to remove id and role
     if (!eventData.startTime) {
         eventData.startTime = new Date();
     }
