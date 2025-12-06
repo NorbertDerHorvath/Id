@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.id.R
-import com.example.id.USER_ROLE_KEY
 import com.example.id.data.entities.WorkdayEvent
 import com.example.id.ui.dialogs.RefuelDialog
 import com.example.id.viewmodel.MainViewModel
@@ -38,12 +37,7 @@ fun MainScreen(
     viewModel: MainViewModel,
     prefs: SharedPreferences
 ) {
-    val userRole = prefs.getString(USER_ROLE_KEY, "user")
-
-    when (userRole) {
-        "admin", "superadmin" -> AdminScreen(navController = navController, viewModel = viewModel, userRole = userRole)
-        else -> UserMainScreen(navController = navController, viewModel = viewModel)
-    }
+    UserMainScreen(navController = navController, viewModel = viewModel)
 }
 
 @Composable
@@ -173,33 +167,6 @@ fun UserMainScreen(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun AdminScreen(
-    navController: NavController,
-    viewModel: MainViewModel,
-    userRole: String? // "admin" or "superadmin"
-) {
-    // TODO: Implement Admin/Superadmin user interface
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Admin Dashboard", style = MaterialTheme.typography.headlineMedium)
-        if (userRole == "superadmin") {
-            Text("(Superadmin)", style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(modifier = Modifier.height(32.dp))
-        // TODO: Add user list, add user button, etc.
-        Text("User management functionality will be here.")
-
-         Spacer(modifier = Modifier.height(32.dp))
-         Button(onClick = { viewModel.logout() }) {
-            Text("Kijelentkezés")
         }
     }
 }

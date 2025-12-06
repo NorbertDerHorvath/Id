@@ -63,7 +63,7 @@ app.post('/api/register', async (req, res) => {
             password,
             role,
             companyId,
-            permissions: role === 'user' ? ['CAN_VIEW_OWN_DATA'] : []
+            permissions: role === 'user' ? ['CAN_VIEW_OWN_DATA'] : (role === 'admin' ? ['CAN_MANAGE_USERS'] : [])
         });
 
         res.status(201).json({
@@ -163,6 +163,8 @@ app.get('/api/workday-events', authenticateToken, async (req, res) => {
         } else if (role === 'admin') {
             const usersInCompany = await User.findAll({ where: { companyId }, attributes: ['id'] });
             whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
+        } else if (role === 'superadmin') {
+            // Superadmin can see everything, so no userId filter needed unless specified
         }
 
         const events = await WorkdayEvent.findAll({ where: whereClause, include: User, order: [['startTime', 'DESC']] });
@@ -208,6 +210,8 @@ app.get('/api/refuel-events', authenticateToken, async (req, res) => {
         } else if (role === 'admin') {
             const usersInCompany = await User.findAll({ where: { companyId }, attributes: ['id'] });
             whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
+        } else if (role === 'superadmin') {
+             // Superadmin sees all
         }
 
         const events = await RefuelEvent.findAll({ where: whereClause, include: User, order: [['timestamp', 'DESC']] });
@@ -244,20 +248,37 @@ const isAdminOrSuperAdmin = (req, res, next) => {
 };
 
 adminRouter.post('/users', isAdminOrSuperAdmin, async (req, res) => {
-    const { username, password, permissions, companyId: targetCompanyId } = req.body;
+    const { username, password, role, permissions, companyId: targetCompanyId } = req.body;
     const { role: adminRole, companyId: adminCompanyId } = req.user;
 
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
 
     let companyIdForNewUser = adminRole === 'superadmin' ? targetCompanyId : adminCompanyId;
-    if (!companyIdForNewUser) return res.status(400).json({ error: 'Company ID is required.' });
+    let roleForNewUser = role || 'user';
+
+    if (adminRole === 'admin' && roleForNewUser === 'admin') {
+        return res.status(403).json({ error: 'Admins cannot create other admins.' });
+    }
+
+    if (roleForNewUser === 'admin' && !targetCompanyId) {
+        // If creating an admin, a new company should probably be created or an existing one assigned.
+        // For simplicity, we'll assume a company ID is provided for new admins.
+        return res.status(400).json({ error: 'Company ID is required to create a new admin.' });
+    }
 
     try {
-        const newUser = await User.create({ username, password, role: 'user', companyId: companyIdForNewUser, permissions: permissions || ['CAN_VIEW_OWN_DATA'] });
+        const newUser = await User.create({ 
+            username, 
+            password, 
+            role: roleForNewUser,
+            companyId: companyIdForNewUser, 
+            permissions: permissions || (roleForNewUser === 'user' ? ['CAN_VIEW_OWN_DATA'] : ['CAN_MANAGE_USERS'])
+        });
         const { password: _, ...userResponse } = newUser.get({ plain: true });
         res.status(201).json({ message: 'User created successfully', user: userResponse });
     } catch (error) {
         if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ error: 'Username already exists.' });
+        console.error("User creation error:", error);
         res.status(500).json({ error: 'Server error while creating user.' });
     }
 });
@@ -265,7 +286,10 @@ adminRouter.post('/users', isAdminOrSuperAdmin, async (req, res) => {
 adminRouter.get('/users', isAdminOrSuperAdmin, async (req, res) => {
     const { companyId, role } = req.user;
     try {
-        let queryOptions = { attributes: { exclude: ['password'] }, include: { model: Company, attributes: ['name'] } };
+        let queryOptions = { 
+            attributes: { exclude: ['password'] }, 
+            include: { model: Company, attributes: ['name'] } 
+        };
         if (role === 'admin') queryOptions.where = { companyId };
         res.json(await User.findAll(queryOptions));
     } catch (error) {
@@ -275,19 +299,37 @@ adminRouter.get('/users', isAdminOrSuperAdmin, async (req, res) => {
 
 adminRouter.put('/users/:userId', isAdminOrSuperAdmin, async (req, res) => {
     const { userId: targetUserId } = req.params;
-    const { permissions } = req.body;
+    const { password, role, permissions } = req.body;
     const { companyId: adminCompanyId, role: adminRole } = req.user;
 
     try {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ error: 'User not found.' });
-        if (adminRole === 'admin' && userToUpdate.companyId !== adminCompanyId) return res.status(403).json({ error: 'Forbidden: You can only edit users in your own company.' });
 
-        if (permissions) userToUpdate.permissions = permissions;
+        if (adminRole === 'admin') {
+            if (userToUpdate.companyId !== adminCompanyId) {
+                return res.status(403).json({ error: 'Forbidden: You can only edit users in your own company.' });
+            }
+            if (role && role !== 'user') {
+                return res.status(403).json({ error: 'Admins can only manage users.' })
+            }
+        }
+
+        if (password) {
+            userToUpdate.password = await bcrypt.hash(password, await bcrypt.genSalt(10));
+        } 
+        if (role && adminRole === 'superadmin') {
+            userToUpdate.role = role;
+        }
+        if (permissions) {
+            userToUpdate.permissions = permissions;
+        }
+
         await userToUpdate.save();
         const { password: _, ...userResponse } = userToUpdate.get({ plain: true });
         res.json({ message: 'User updated successfully.', user: userResponse });
     } catch (error) {
+        console.error("User update error:", error);
         res.status(500).json({ error: 'Failed to update user.' });
     }
 });
