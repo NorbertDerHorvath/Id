@@ -15,6 +15,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.id.USER_NAME_KEY
+import com.example.id.USER_PERMISSIONS_KEY
+import com.example.id.USER_ROLE_KEY
 import com.example.id.data.AppRepository
 import com.example.id.data.entities.BreakEvent
 import com.example.id.data.entities.EventType
@@ -51,6 +53,13 @@ sealed class LoginUiState {
     data class Error(val message: String) : LoginUiState()
 }
 
+sealed class RegisterUiState {
+    object Idle : RegisterUiState()
+    object Loading : RegisterUiState()
+    object Success : RegisterUiState()
+    data class Error(val message: String) : RegisterUiState()
+}
+
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val application: Application,
@@ -63,6 +72,9 @@ class MainViewModel @Inject constructor(
 
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState
+
+    private val _registerState = MutableStateFlow<RegisterUiState>(RegisterUiState.Idle)
+    val registerState: StateFlow<RegisterUiState> = _registerState
 
     private val userId: String
         get() = prefs.getString(USER_NAME_KEY, "unknown_user")!!
@@ -191,7 +203,11 @@ class MainViewModel @Inject constructor(
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     authRepository.saveToken(body.token)
-                    prefs.edit().putString(USER_NAME_KEY, username).apply()
+                    prefs.edit()
+                        .putString(USER_NAME_KEY, username)
+                        .putString(USER_ROLE_KEY, body.role)
+                        .putStringSet(USER_PERMISSIONS_KEY, body.permissions.toSet())
+                        .apply()
                     initialize()
                     triggerSync()
                 } else {
@@ -204,10 +220,35 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun register(username: String, password: String, role: String, companyName: String?, adminEmail: String?) {
+        viewModelScope.launch {
+            _registerState.value = RegisterUiState.Loading
+            try {
+                val response = authRepository.register(username, password, role, companyName, adminEmail)
+                if (response.isSuccessful) {
+                    _registerState.value = RegisterUiState.Success
+                } else {
+                    val errorBody = response.errorBody()?.string() ?: "Unknown registration error"
+                    _registerState.value = RegisterUiState.Error(errorBody)
+                }
+            } catch (e: Exception) {
+                _registerState.value = RegisterUiState.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
+    fun resetRegisterState() {
+        _registerState.value = RegisterUiState.Idle
+    }
+
     fun logout() {
         viewModelScope.launch {
             authRepository.clearToken()
-            prefs.edit().remove(USER_NAME_KEY).apply()
+            prefs.edit()
+                .remove(USER_NAME_KEY)
+                .remove(USER_ROLE_KEY)
+                .remove(USER_PERMISSIONS_KEY)
+                .apply()
             _loginState.value = LoginUiState.Idle
             activeWorkdayEvent = null
             activeBreakEvent = null
@@ -250,7 +291,7 @@ class MainViewModel @Inject constructor(
             val address = getAddressFromLocation(application, location)
             val newWorkday = WorkdayEvent(
                 userId = userId,
-                role = prefs.getString("user_role", "driver")!!,
+                role = prefs.getString(USER_ROLE_KEY, "user")!!,
                 startTime = Date(),
                 endTime = null,
                 startDate = null,
@@ -360,7 +401,7 @@ class MainViewModel @Inject constructor(
 
                 val newAbsence = WorkdayEvent(
                     userId = userId,
-                    role = prefs.getString("user_role", "driver")!!,
+                    role = prefs.getString(USER_ROLE_KEY, "user")!!,
                     startTime = startDate,
                     endTime = endDate,
                     startDate = startDate,
@@ -390,7 +431,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val newWorkday = WorkdayEvent(
                 userId = userId,
-                role = prefs.getString("user_role", "driver")!!,
+                role = prefs.getString(USER_ROLE_KEY, "user")!!,
                 startTime = startTime,
                 endTime = endTime,
                 startDate = if (type != EventType.WORK) startTime else null,

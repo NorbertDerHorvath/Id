@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login / Register</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f0f2f5; }
+        .container { background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #333; }
+        form { display: flex; flex-direction: column; gap: 1rem; }
+        input { padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 0.8rem; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        #error, #message { text-align: center; margin-top: 1rem; }
+        #error { color: red; }
+        #message { color: green; }
+        .toggle-form { text-align: center; margin-top: 1rem; }
+        .toggle-form a { color: #007bff; cursor: pointer; text-decoration: none; }
+        #admin-fields { display: none; flex-direction: column; gap: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="login-view">
+            <h2>Login</h2>
+            <form id="login-form">
+                <input type="text" id="login-username" placeholder="Username" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+            <div class="toggle-form">Don't have an account? <a onclick="showRegisterView()">Register</a></div>
+        </div>
+
+        <div id="register-view" style="display:none;">
+            <h2>Register</h2>
+            <form id="register-form">
+                <input type="text" id="register-username" placeholder="Username" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <select id="register-role" onchange="toggleAdminFields()">
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <div id="admin-fields">
+                    <input type="text" id="register-companyName" placeholder="Company Name">
+                    <input type="email" id="register-adminEmail" placeholder="Admin Email">
+                </div>
+                <button type="submit">Register</button>
+            </form>
+            <div class="toggle-form">Already have an account? <a onclick="showLoginView()">Login</a></div>
+        </div>
+        <p id="error"></p>
+        <p id="message"></p>
+    </div>
+
+    <script>
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const errorDiv = document.getElementById('error');
+        const messageDiv = document.getElementById('message');
+
+        function showRegisterView() {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('register-view').style.display = 'block';
+            clearMessages();
+        }
+
+        function showLoginView() {
+            document.getElementById('register-view').style.display = 'none';
+            document.getElementById('login-view').style.display = 'block';
+            clearMessages();
+        }
+
+        function toggleAdminFields() {
+            const role = document.getElementById('register-role').value;
+            const adminFields = document.getElementById('admin-fields');
+            adminFields.style.display = role === 'admin' ? 'flex' : 'none';
+        }
+
+        function clearMessages() {
+            errorDiv.textContent = '';
+            messageDiv.textContent = '';
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMessages();
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', data.username);
+                    window.location.href = '/dashboard';
+                } else {
+                    errorDiv.textContent = data.error || 'Login failed.';
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Network error. Could not connect to the server.';
+            }
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMessages();
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+            const role = document.getElementById('register-role').value;
+            const companyName = document.getElementById('register-companyName').value;
+            const adminEmail = document.getElementById('register-adminEmail').value;
+
+            const body = { username, password, role };
+            if (role === 'admin') {
+                body.companyName = companyName;
+                body.adminEmail = adminEmail;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    messageDiv.textContent = 'Registration successful! Please login.';
+                    showLoginView();
+                    loginForm.reset();
+                    registerForm.reset();
+                } else {
+                    errorDiv.textContent = data.error || 'Registration failed.';
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Network error. Could not connect to the server.';
+            }
+        });
+
+        // Check for token on page load
+        if (localStorage.getItem('token')) {
+             fetch('/api/validate-token', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            }).then(res => {
+                if(res.ok) window.location.href = '/dashboard';
+                else localStorage.clear(); // Clear invalid token
+            })
+        }
+    </script>
+</body>
+</html>

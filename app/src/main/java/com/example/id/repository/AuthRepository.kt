@@ -5,6 +5,8 @@ import com.example.id.AUTH_TOKEN_KEY
 import com.example.id.network.ApiService
 import com.example.id.network.LoginRequest
 import com.example.id.network.LoginResponse
+import com.example.id.network.RegisterRequest
+import com.example.id.network.RegisterResponse
 import com.example.id.network.ValidateResponse
 import retrofit2.Response
 import javax.inject.Inject
@@ -16,6 +18,10 @@ class AuthRepository @Inject constructor(
 
     suspend fun login(username: String, password: String): Response<LoginResponse> {
         return apiService.login(LoginRequest(username, password))
+    }
+
+    suspend fun register(username: String, password: String, role: String, companyName: String?, adminEmail: String?): Response<RegisterResponse> {
+        return apiService.register(RegisterRequest(username, password, role, companyName, adminEmail))
     }
 
     suspend fun validateToken(): Response<ValidateResponse> {

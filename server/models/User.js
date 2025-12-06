@@ -18,8 +18,12 @@ const User = sequelize.define('User', {
     allowNull: false,
   },
   role: {
-    type: DataTypes.ENUM('admin', 'driver'),
+    type: DataTypes.ENUM('superadmin', 'admin', 'user'),
     allowNull: false,
+  },
+  permissions: {
+    type: DataTypes.JSON, // Using JSON type for permissions
+    allowNull: true,
   },
   lastLoginTime: {
     type: DataTypes.DATE,

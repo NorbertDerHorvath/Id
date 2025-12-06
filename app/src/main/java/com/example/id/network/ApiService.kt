@@ -20,7 +20,25 @@ data class LoginRequest(
 data class LoginResponse(
     val token: String,
     val message: String,
-    val username: String
+    val username: String,
+    val role: String,
+    val permissions: List<String>
+)
+
+// Data classes for Registration
+data class RegisterRequest(
+    val username: String,
+    val password: String,
+    val role: String,
+    val companyName: String? = null,
+    val adminEmail: String? = null
+)
+
+data class RegisterResponse(
+    val message: String,
+    val userId: String,
+    val username: String,
+    val role: String
 )
 
 data class ValidateRequest(
@@ -66,6 +84,9 @@ interface ApiService {
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+
+    @POST("api/register")
+    suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
 
     @GET("api/validate-token")
     suspend fun validateToken(): Response<ValidateResponse>

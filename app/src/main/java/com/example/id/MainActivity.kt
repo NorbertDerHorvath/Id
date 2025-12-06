@@ -1,6 +1,7 @@
 package com.example.id
 
 import android.Manifest
+import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,14 +34,19 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var prefs: SharedPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             IdTheme {
-                PermissionWrapper()
+                PermissionWrapper(prefs = prefs)
             }
         }
     }
@@ -48,11 +54,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun PermissionWrapper() {
+fun PermissionWrapper(prefs: SharedPreferences) {
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
     if (locationPermissionState.status.isGranted) {
-        AppNavigation()
+        AppNavigation(prefs = prefs)
     } else {
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             Text(
@@ -70,7 +76,7 @@ fun PermissionWrapper() {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(prefs: SharedPreferences) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = hiltViewModel()
     val loginState by mainViewModel.loginState.collectAsState()
@@ -86,7 +92,7 @@ fun AppNavigation() {
             LoginScreen(navController = navController, viewModel = mainViewModel)
         }
         composable("main") {
-            MainScreen(navController = navController, viewModel = mainViewModel)
+            MainScreen(navController = navController, viewModel = mainViewModel, prefs = prefs)
         }
         composable("query_screen") {
             QueryScreen(navController = navController, viewModel = mainViewModel)
