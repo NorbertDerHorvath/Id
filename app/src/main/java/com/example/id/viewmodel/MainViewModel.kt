@@ -21,6 +21,7 @@ import com.example.id.data.entities.EventType
 import com.example.id.data.entities.LoadingEvent
 import com.example.id.data.entities.RefuelEvent
 import com.example.id.data.entities.WorkdayEvent
+import com.example.id.network.ApiService
 import com.example.id.repository.AuthRepository
 import com.example.id.worker.SyncWorker
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -32,7 +33,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
@@ -56,6 +56,7 @@ class MainViewModel @Inject constructor(
     private val application: Application,
     private val repository: AppRepository,
     private val authRepository: AuthRepository,
+    private val apiService: ApiService,
     private val prefs: SharedPreferences,
     private val workManager: WorkManager
 ) : ViewModel() {
@@ -495,81 +496,27 @@ class MainViewModel @Inject constructor(
 
     fun queryWorkdays(startDate: String, endDate: String, carPlate: String?) {
         viewModelScope.launch {
-            if (userId == "unknown_user") return@launch
-            synchronizeAndWait()
-            val dateFormat = SimpleDateFormat("yyyy.MM.dd", Locale.getDefault())
-
-            val startCal = Calendar.getInstance().apply {
-                if (startDate.isNotBlank()) {
-                    time = dateFormat.parse(startDate)!!
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
+            try {
+                val response = apiService.getWorkdayEvents(startDate, endDate, carPlate)
+                if (response.isSuccessful) {
+                    _workdayQueryResults.value = response.body() ?: emptyList()
                 }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error querying workdays", e)
             }
-            val endCal = Calendar.getInstance().apply {
-                if (endDate.isNotBlank()) {
-                    time = dateFormat.parse(endDate)!!
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }
-            }
-
-            val start = if (startDate.isNotBlank()) startCal.time else null
-            val end = if (endDate.isNotBlank()) endCal.time else null
-
-            val workdayEvents = repository.getAllWorkdayEvents(userId).firstOrNull() ?: emptyList<WorkdayEvent>()
-
-            val filteredWorkdays = workdayEvents.filter<WorkdayEvent> { event ->
-                val eventDate = event.startTime
-                val carPlateMatch = carPlate.isNullOrBlank() || event.carPlate?.contains(carPlate, ignoreCase = true) == true
-                val dateMatch = (start == null || !eventDate.before(start)) && (end == null || !eventDate.after(end))
-                dateMatch && carPlateMatch
-            }
-            _workdayQueryResults.value = filteredWorkdays
         }
     }
 
     fun queryRefuels(startDate: String, endDate: String, carPlate: String?) {
         viewModelScope.launch {
-            if (userId == "unknown_user") return@launch
-            synchronizeAndWait()
-            val dateFormat = SimpleDateFormat("yyyy.MM.dd", Locale.getDefault())
-
-            val startCal = Calendar.getInstance().apply {
-                if (startDate.isNotBlank()) {
-                    time = dateFormat.parse(startDate)!!
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
+            try {
+                val response = apiService.getRefuelEvents(startDate, endDate, carPlate)
+                if (response.isSuccessful) {
+                    _refuelQueryResults.value = response.body() ?: emptyList()
                 }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error querying refuels", e)
             }
-            val endCal = Calendar.getInstance().apply {
-                if (endDate.isNotBlank()) {
-                    time = dateFormat.parse(endDate)!!
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }
-            }
-
-            val start = if (startDate.isNotBlank()) startCal.time else null
-            val end = if (endDate.isNotBlank()) endCal.time else null
-
-            val refuelEvents = repository.getAllRefuelEvents(userId).firstOrNull() ?: emptyList<RefuelEvent>()
-
-            val filteredRefuels = refuelEvents.filter<RefuelEvent> { event ->
-                val eventDate = event.timestamp
-                val carPlateMatch = carPlate.isNullOrBlank() || event.carPlate.contains(carPlate, ignoreCase = true)
-                val dateMatch = (start == null || !eventDate.before(start)) && (end == null || !eventDate.after(end))
-                dateMatch && carPlateMatch
-            }
-            _refuelQueryResults.value = filteredRefuels
         }
     }
 
