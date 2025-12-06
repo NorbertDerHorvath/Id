@@ -119,6 +119,22 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
   }
 });
 
+app.put('/api/workday-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await WorkdayEvent.findByPk(req.params.id);
+        if (event) {
+            const { id, ...eventData } = req.body;
+            await event.update(eventData);
+            res.json(event);
+        } else {
+            res.status(404).json({ error: 'WorkdayEvent not found' });
+        }
+    } catch (error) {
+        console.error('Error updating workday event:', error);
+        res.status(500).json({ error: 'Failed to update workday event.' });
+    }
+});
+
 app.get('/api/workday-events', async (req, res) => {
   try {
     const events = await WorkdayEvent.findAll({ include: User });

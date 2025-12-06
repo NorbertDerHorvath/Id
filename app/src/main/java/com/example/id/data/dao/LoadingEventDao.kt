@@ -45,7 +45,7 @@ interface LoadingEventDao {
     @Query("SELECT * FROM loading_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
     suspend fun getLoadingEventsAfter(userId: String, sevenDaysAgo: Date): List<LoadingEvent>
 
-    @Query("SELECT * FROM loading_events WHERE isSynced = 0")
+    @Query("SELECT * FROM loading_events WHERE isSynced = 0 AND endTime IS NOT NULL")
     suspend fun getUnsyncedLoadingEvents(): List<LoadingEvent>
 
     @Query("UPDATE loading_events SET isSynced = 1 WHERE id = :id")
