@@ -22,11 +22,7 @@
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2>User Management</h2>
-            <div>
-                <button id="debug-btn" class="btn btn-secondary mr-2" style="display: none;">Get Debug Data</button>
-                <button id="merge-companies-btn" class="btn btn-warning mr-2" style="display: none;">Merge Duplicate Companies</button>
-                <button class="btn btn-primary" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
-            </div>
+            <button class="btn btn-primary" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
         </div>
         <table class="table table-striped">
             <thead>
@@ -35,7 +31,6 @@
                     <th>Real Name</th>
                     <th>Role</th>
                     <th>Company</th>
-                    <th>Company ID</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -88,22 +83,6 @@
         </div>
     </div>
 
-    <!-- Debug Modal -->
-    <div class="modal fade" id="debugModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Debug Data</h5>
-                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
-                </div>
-                <div class="modal-body">
-                    <p>Copy the JSON data below and provide it for analysis.</p>
-                    <textarea id="debug-data-textarea" class="form-control" rows="20" readonly></textarea>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
@@ -120,44 +99,12 @@
             if (!decodedToken) { window.location.href = '/login.html'; return; }
             currentUserRole = decodedToken.role;
 
-            if (currentUserRole === 'superadmin') {
-                document.getElementById('merge-companies-btn').style.display = 'inline-block';
-                document.getElementById('debug-btn').style.display = 'inline-block';
-            }
-
             loadUsers();
             
             document.getElementById('logout-btn').addEventListener('click', () => {
                 localStorage.removeItem('token');
                 localStorage.removeItem('username');
                 window.location.href = '/login.html';
-            });
-            
-            document.getElementById('merge-companies-btn').addEventListener('click', async () => {
-                 if (!confirm('Are you sure you want to merge duplicate companies? This action cannot be undone.')) return;
-                try {
-                    const response = await fetch('/api/admin/merge-companies', { method: 'GET', headers: { 'Authorization': `Bearer ${token}` } });
-                    const resultText = await response.text(); 
-                    alert(resultText || 'Merge process finished.');
-                    loadUsers();
-                } catch (error) {
-                    alert('Error merging companies: ' + error.message);
-                }
-            });
-
-            document.getElementById('debug-btn').addEventListener('click', async () => {
-                try {
-                    const response = await fetch('/api/admin/debug-dump', { headers: { 'Authorization': `Bearer ${token}` } });
-                    if (!response.ok) {
-                         const err = await response.json();
-                         throw new Error(err.error || `HTTP Error: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    document.getElementById('debug-data-textarea').value = JSON.stringify(data, null, 2);
-                    $('#debugModal').modal('show');
-                } catch (error) {
-                    alert('Error fetching debug data: ' + error.message);
-                }
             });
         });
 
@@ -172,7 +119,7 @@
                 const users = await response.json();
                 tableBody.innerHTML = '';
                 if (users.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No users found.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No users found.</td></tr>';
                     return;
                 }
                 users.forEach(user => {
@@ -182,13 +129,12 @@
                             <td>${user.realName || 'N/A'}</td>
                             <td>${user.role}</td>
                             <td>${user.Company ? user.Company.name : 'N/A'}</td>
-                            <td><code>${user.companyId || 'N/A'}</code></td>
                             <td><button class="btn btn-sm btn-info" onclick='prepareEditUserModal(${JSON.stringify(user)})'>Edit</button></td>
                         </tr>
                     `;
                 });
             } catch (error) {
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger"><b>Error:</b> ${error.message}</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger"><b>Error:</b> ${error.message}</td></tr>`;
                 console.error('Error loading users:', error);
             }
         }
@@ -220,7 +166,6 @@
 
             document.getElementById('role-group').style.display = 'block';
             document.getElementById('superadmin-role-option').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
-            
             document.getElementById('company-name-group').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
             
             $('#userModal').modal('show');
