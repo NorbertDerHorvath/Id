@@ -22,6 +22,10 @@ app.get('/dashboard', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+app.get('/admin', (req, res) => {
+    res.sendFile(__dirname + '/admin.html');
+});
+
 app.get('/edit_workday.html', (req, res) => {
   res.sendFile(__dirname + '/edit_workday.html');
 });
@@ -247,8 +251,22 @@ const isAdminOrSuperAdmin = (req, res, next) => {
     next();
 };
 
+adminRouter.get('/users', isAdminOrSuperAdmin, async (req, res) => {
+    const { companyId, role } = req.user;
+    try {
+        let queryOptions = {
+            attributes: { exclude: ['password'] },
+            include: { model: Company, attributes: ['name'] }
+        };
+        if (role === 'admin') queryOptions.where = { companyId };
+        res.json(await User.findAll(queryOptions));
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch users.' });
+    }
+});
+
 adminRouter.post('/users', isAdminOrSuperAdmin, async (req, res) => {
-    const { username, password, role, permissions, companyId: targetCompanyId } = req.body;
+    const { username, password, role, permissions, companyId: targetCompanyId, realName } = req.body;
     const { role: adminRole, companyId: adminCompanyId } = req.user;
 
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
@@ -256,22 +274,21 @@ adminRouter.post('/users', isAdminOrSuperAdmin, async (req, res) => {
     let companyIdForNewUser = adminRole === 'superadmin' ? targetCompanyId : adminCompanyId;
     let roleForNewUser = role || 'user';
 
-    if (adminRole === 'admin' && roleForNewUser === 'admin') {
-        return res.status(403).json({ error: 'Admins cannot create other admins.' });
+    if (adminRole === 'admin' && roleForNewUser !== 'user') {
+        return res.status(403).json({ error: 'Admins can only create users.' });
     }
-
-    if (roleForNewUser === 'admin' && !targetCompanyId) {
-        // If creating an admin, a new company should probably be created or an existing one assigned.
-        // For simplicity, we'll assume a company ID is provided for new admins.
-        return res.status(400).json({ error: 'Company ID is required to create a new admin.' });
+    if (roleForNewUser === 'admin' && !companyIdForNewUser && adminRole === 'superadmin') {
+        // Superadmin needs to provide a companyId for new admins
+         return res.status(400).json({ error: 'Company ID is required for new admins.' });
     }
 
     try {
-        const newUser = await User.create({ 
-            username, 
-            password, 
+        const newUser = await User.create({
+            username,
+            password,
             role: roleForNewUser,
-            companyId: companyIdForNewUser, 
+            realName,
+            companyId: companyIdForNewUser,
             permissions: permissions || (roleForNewUser === 'user' ? ['CAN_VIEW_OWN_DATA'] : ['CAN_MANAGE_USERS'])
         });
         const { password: _, ...userResponse } = newUser.get({ plain: true });
@@ -283,23 +300,10 @@ adminRouter.post('/users', isAdminOrSuperAdmin, async (req, res) => {
     }
 });
 
-adminRouter.get('/users', isAdminOrSuperAdmin, async (req, res) => {
-    const { companyId, role } = req.user;
-    try {
-        let queryOptions = { 
-            attributes: { exclude: ['password'] }, 
-            include: { model: Company, attributes: ['name'] } 
-        };
-        if (role === 'admin') queryOptions.where = { companyId };
-        res.json(await User.findAll(queryOptions));
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch users.' });
-    }
-});
 
 adminRouter.put('/users/:userId', isAdminOrSuperAdmin, async (req, res) => {
     const { userId: targetUserId } = req.params;
-    const { password, role, permissions } = req.body;
+    const { password, role, permissions, realName } = req.body;
     const { companyId: adminCompanyId, role: adminRole } = req.user;
 
     try {
@@ -317,7 +321,10 @@ adminRouter.put('/users/:userId', isAdminOrSuperAdmin, async (req, res) => {
 
         if (password) {
             userToUpdate.password = await bcrypt.hash(password, await bcrypt.genSalt(10));
-        } 
+        }
+        if (realName) {
+            userToUpdate.realName = realName;
+        }
         if (role && adminRole === 'superadmin') {
             userToUpdate.role = role;
         }
@@ -341,7 +348,7 @@ const createSuperAdmin = async () => {
     try {
         const superadmin = await User.findOne({ where: { username: 'norbapp' } });
         if (!superadmin) {
-            await User.create({ username: 'norbapp', password: 'norbapp', role: 'superadmin', permissions: ['ALL'] });
+            await User.create({ username: 'norbapp', password: 'norbapp', role: 'superadmin', realName: 'Super Admin', permissions: ['ALL'] });
             console.log('Superadmin user "norbapp" created.');
         } else {
              const isPasswordCorrect = await superadmin.isValidPassword('norbapp');

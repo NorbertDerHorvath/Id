@@ -12,7 +12,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.id.USER_NAME_KEY
 import com.example.id.USER_PERMISSIONS_KEY
@@ -33,13 +32,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -51,13 +47,6 @@ sealed class LoginUiState {
     object Loading : LoginUiState()
     object Success : LoginUiState()
     data class Error(val message: String) : LoginUiState()
-}
-
-sealed class RegisterUiState {
-    object Idle : RegisterUiState()
-    object Loading : RegisterUiState()
-    object Success : RegisterUiState()
-    data class Error(val message: String) : RegisterUiState()
 }
 
 @HiltViewModel
@@ -72,9 +61,6 @@ class MainViewModel @Inject constructor(
 
     private val _loginState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val loginState: StateFlow<LoginUiState> = _loginState
-
-    private val _registerState = MutableStateFlow<RegisterUiState>(RegisterUiState.Idle)
-    val registerState: StateFlow<RegisterUiState> = _registerState
 
     private val userId: String
         get() = prefs.getString(USER_NAME_KEY, "unknown_user")!!
@@ -136,11 +122,10 @@ class MainViewModel @Inject constructor(
                     _loginState.value = LoginUiState.Success
                     observeUserData()
                 } else {
-                    authRepository.clearToken()
-                    _loginState.value = LoginUiState.Error("Invalid token")
+                    logout() // Clear all data if token is invalid
                 }
             } catch (e: Exception) {
-                _loginState.value = LoginUiState.Error(e.message ?: "Network error")
+                 logout() // Clear all data on network error
             }
         }
     }
@@ -218,27 +203,6 @@ class MainViewModel @Inject constructor(
                 _loginState.value = LoginUiState.Error(e.message ?: "Network error")
             }
         }
-    }
-
-    fun register(username: String, password: String, role: String, companyName: String?, adminEmail: String?) {
-        viewModelScope.launch {
-            _registerState.value = RegisterUiState.Loading
-            try {
-                val response = authRepository.register(username, password, role, companyName, adminEmail)
-                if (response.isSuccessful) {
-                    _registerState.value = RegisterUiState.Success
-                } else {
-                    val errorBody = response.errorBody()?.string() ?: "Unknown registration error"
-                    _registerState.value = RegisterUiState.Error(errorBody)
-                }
-            } catch (e: Exception) {
-                _registerState.value = RegisterUiState.Error(e.message ?: "Network error")
-            }
-        }
-    }
-
-    fun resetRegisterState() {
-        _registerState.value = RegisterUiState.Idle
     }
 
     fun logout() {

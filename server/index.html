@@ -13,6 +13,9 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <a class="navbar-brand" href="#">Idő Dashboard</a>
         <div class="collapse navbar-collapse">
+            <ul class="navbar-nav mr-auto" id="nav-links">
+                <li class="nav-item active"><a class="nav-link" href="/dashboard">Home</a></li>
+            </ul>
             <ul class="navbar-nav ml-auto">
                  <li class="nav-item"><span class="navbar-text mr-3">Welcome, <span id="username-display"></span>!</span></li>
                 <li class="nav-item"><button id="logout-btn" class="btn btn-danger">Logout</button></li>
@@ -34,25 +37,40 @@
     </div>
 
     <script>
+         function parseJwt(token) {
+            try {
+                return JSON.parse(atob(token.split('.')[1]));
+            } catch (e) {
+                return null;
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const token = localStorage.getItem('token');
             if (!token) {
-                window.location.href = '/'; 
+                window.location.href = '/login.html'; 
                 return;
             }
-             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
+            document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
+
+            const decodedToken = parseJwt(token);
+            if (decodedToken && (decodedToken.role === 'admin' || decodedToken.role === 'superadmin')) {
+                const navLinks = document.getElementById('nav-links');
+                const adminLi = document.createElement('li');
+                adminLi.className = 'nav-item';
+                adminLi.innerHTML = `<a class="nav-link" href="/admin">Admin</a>`;
+                navLinks.appendChild(adminLi);
+            }
 
             fetchEvents('/api/workday-events', 'workday-events', formatWorkdayEvent, token);
             fetchEvents('/api/refuel-events', 'refuel-events', formatRefuelEvent, token);
 
             document.getElementById('logout-btn').addEventListener('click', () => {
-                fetch('/api/logout', { 
-                    method: 'POST' 
-                })
+                fetch('/api/logout', { method: 'POST' })
                 .finally(() => {
                     localStorage.removeItem('token');
                     localStorage.removeItem('username');
-                    window.location.href = '/';
+                    window.location.href = '/login.html';
                 });
             });
         });
@@ -64,7 +82,7 @@
                 });
                 if (response.status === 403 || response.status === 401) {
                     localStorage.clear();
-                    window.location.href = '/';
+                    window.location.href = '/login.html';
                 }
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const events = await response.json();
@@ -85,7 +103,7 @@
         function formatWorkdayEvent(event) {
             return `
                 <div class="card-body">
-                    <h5 class="card-title">Workday by ${event.User.username}</h5>
+                    <h5 class="card-title">Workday by ${event.User ? event.User.username : 'N/A'}</h5>
                     <p class="card-text">Car: ${event.carPlate || 'N/A'}</p>
                     <p class="card-text">Starts: ${new Date(event.startTime).toLocaleString()}</p>
                     <p class="card-text">Ends: ${event.endTime ? new Date(event.endTime).toLocaleString() : 'Ongoing'}</p>
@@ -97,7 +115,7 @@
         function formatRefuelEvent(event) {
             return `
                 <div class="card-body">
-                    <h5 class="card-title">Refuel by ${event.User.username}</h5>
+                    <h5 class="card-title">Refuel by ${event.User ? event.User.username : 'N/A'}</h5>
                      <p class="card-text">Car: ${event.carPlate || 'N/A'}</p>
                     <p class="card-text">Amount: ${event.fuelAmount}L of ${event.fuelType}</p>
                     <p class="card-text">Date: ${new Date(event.timestamp).toLocaleString()}</p>
