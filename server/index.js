@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Op } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent } = require('./models');
+const { Op } = require('sequelize'); // <--- HELYES IMPORT
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
 const bcrypt = require('bcryptjs');
@@ -235,12 +236,21 @@ adminRouter.put('/users/:userId', async (req, res) => {
 });
 
 adminRouter.get('/debug-dump', async (req, res) => {
-    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden: Superadmin only.' });
+    if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden: Superadmin only.' });
+    }
     try {
-        const users = await User.findAll({ attributes: ['id', 'username', 'role', 'companyId', 'realName'], include: { model: Company, attributes: ['id', 'name'] }, order: [['companyId', 'ASC'], ['username', 'ASC']] });
+        const users = await User.findAll({
+            attributes: ['id', 'username', 'role', 'companyId', 'realName'],
+            include: { model: Company, attributes: ['id', 'name'] },
+            order: [['companyId', 'ASC'], ['username', 'ASC']]
+        });
         const companies = await Company.findAll({order: [['name', 'ASC']]});
         res.json({ users, companies });
-    } catch (error) { res.status(500).json({ error: 'Failed to generate debug dump.' }); }
+    } catch (error) {
+        console.error('Error during debug dump:', error);
+        res.status(500).json({ error: 'Failed to generate debug dump.' });
+    }
 });
 
 adminRouter.get('/merge-companies', async (req, res) => {
