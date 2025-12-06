@@ -34,6 +34,7 @@
                     <th>Real Name</th>
                     <th>Role</th>
                     <th>Company</th>
+                    <th>Company ID</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -141,6 +142,7 @@
                             <td>${user.realName || 'N/A'}</td>
                             <td>${user.role}</td>
                             <td>${user.Company ? user.Company.name : 'N/A'}</td>
+                            <td><code>${user.companyId || 'N/A'}</code></td>
                             <td><button class="btn btn-sm btn-info" onclick='prepareEditUserModal(${JSON.stringify(user)})'>Edit</button></td>
                         </tr>
                     `;
@@ -177,7 +179,6 @@
             document.getElementById('role-group').style.display = 'block';
             document.getElementById('superadmin-role-option').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
             
-            // Admins can't change company, Superadmins can
             document.getElementById('company-name-group').style.display = currentUserRole === 'superadmin' ? 'block' : 'none';
             
             $('#userModal').modal('show');
