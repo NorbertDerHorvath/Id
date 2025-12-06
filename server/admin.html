@@ -67,7 +67,7 @@
                                 <option id="superadmin-role-option" value="superadmin" style="display: none;">Superadmin</option>
                             </select>
                         </div>
-                        <div class="form-group" id="company-name-group" style="display: none;">
+                        <div class="form-group" id="company-name-group">
                             <label for="companyName">Company Name</label>
                             <input type="text" class="form-control" id="companyName">
                         </div>
@@ -133,15 +133,15 @@
             document.getElementById('user-form').reset();
             document.getElementById('userId').value = '';
             document.getElementById('username').readOnly = false;
-            document.getElementById('company-name-group').style.display = 'none';
             document.getElementById('superadmin-role-option').style.display = 'none';
-            document.getElementById('role-group').style.display = 'block'; // Show role dropdown for all admins
+            document.getElementById('role-group').style.display = 'block';
+            document.getElementById('company-name-group').style.display = 'block';
 
             if (currentUserRole === 'superadmin') {
                 document.getElementById('superadmin-role-option').style.display = 'block';
-                document.getElementById('company-name-group').style.display = 'block';
-            } else {
-                document.getElementById('role').value = 'user'; // Admins default to creating users
+            } else { // Admin
+                document.getElementById('role').value = 'user'; 
+                document.getElementById('company-name-group').style.display = 'none'; // Admins can't change company
             }
             
             $('#userModal').modal('show');
@@ -154,7 +154,8 @@
             document.getElementById('username').readOnly = true; 
             document.getElementById('realName').value = user.realName || '';
             document.getElementById('role').value = user.role;
-            
+            document.getElementById('companyName').value = user.Company ? user.Company.name : '';
+
             document.getElementById('role-group').style.display = 'block';
             document.getElementById('superadmin-role-option').style.display = 'none';
             document.getElementById('company-name-group').style.display = 'none';
@@ -162,8 +163,7 @@
             if (currentUserRole === 'superadmin') {
                  document.getElementById('superadmin-role-option').style.display = 'block';
                  document.getElementById('company-name-group').style.display = 'block';
-                 document.getElementById('companyName').value = user.Company ? user.Company.name : '';
-            } 
+            }
             
             $('#userModal').modal('show');
         }

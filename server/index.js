@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 8080;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname)); // Serve static files like login.html
+app.use(express.static(__dirname));
 
 // --- HTML Serving ---
 app.get('/', (req, res) => {
@@ -37,13 +37,10 @@ app.get('/edit_refuel.html', (req, res) => {
 // --- Public API Routes ---
 
 app.post('/api/register', async (req, res) => {
-    const { username, password, role, companyName, adminEmail } = req.body;
+    const { username, password, role, companyName, adminEmail, realName } = req.body;
 
     if (!username || !password || !role) {
         return res.status(400).json({ error: 'Username, password, and role are required.' });
-    }
-    if (role === 'admin' && (!companyName || !adminEmail)) {
-        return res.status(400).json({ error: 'Company name and admin email are required for admin registration.' });
     }
 
     try {
@@ -52,22 +49,29 @@ app.post('/api/register', async (req, res) => {
             return res.status(409).json({ error: 'Username already taken.' });
         }
 
-        const [company] = await Company.findOrCreate({
-            where: { name: companyName },
-            defaults: { adminEmail: adminEmail }
-        });
+        let companyId = null;
+        if (role === 'admin' && companyName) {
+            if (!adminEmail) return res.status(400).json({ error: 'Admin email is required for admin registration.' });
+            const [company] = await Company.findOrCreate({
+                where: { name: companyName },
+                defaults: { name: companyName, adminEmail: adminEmail }
+            });
+            companyId = company.id;
+        } else if (role === 'user') {
+            return res.status(403).json({ error: 'Users cannot be registered through this public endpoint.' });
+        }
 
         const newUser = await User.create({
             username,
             password,
             role,
-            companyId: company.id,
-            realName: req.body.realName || username,
-            permissions: role === 'user' ? ['CAN_VIEW_OWN_DATA'] : (role === 'admin' ? ['CAN_MANAGE_USERS'] : [])
+            companyId,
+            realName: realName || username,
+            permissions: role === 'admin' ? ['CAN_MANAGE_USERS'] : []
         });
 
         res.status(201).json({
-            message: 'User registered successfully.',
+            message: 'Admin registered successfully.',
             userId: newUser.id,
             username: newUser.username,
             role: newUser.role
@@ -165,7 +169,7 @@ adminRouter.post('/users', async (req, res) => {
         try {
             const [company] = await Company.findOrCreate({
                 where: { name: companyName }, 
-                defaults: { name: companyName, adminEmail: `${username}@company.com` } // Placeholder email
+                defaults: { name: companyName, adminEmail: `${username}@company.com` }
             });
             finalCompanyId = company.id;
         } catch(e) {
@@ -203,17 +207,15 @@ adminRouter.put('/users/:userId', async (req, res) => {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ error: 'User not found.' });
 
-        // Security check: No one can edit a superadmin except another superadmin (or themselves)
         if (userToUpdate.role === 'superadmin' && adminRole !== 'superadmin') {
             return res.status(403).json({ error: 'You do not have permission to edit a superadmin.'});
         }
 
-        // Admin specific rules
         if (adminRole === 'admin') {
             if (userToUpdate.companyId !== adminCompanyId) {
                 return res.status(403).json({ error: 'Forbidden: You can only edit users in your own company.' });
             }
-            if (role === 'superadmin') { // Admins cannot promote to superadmin
+            if (role === 'superadmin') {
                 return res.status(403).json({ error: 'Admins cannot assign superadmin role.' });
             }
         }
@@ -222,8 +224,7 @@ adminRouter.put('/users/:userId', async (req, res) => {
         if (realName) userToUpdate.realName = realName;
         if (role) userToUpdate.role = role;
         
-        // Superadmin can change company by name
-        if (adminRole === 'superadmin' && companyName) {
+        if (companyName && (adminRole === 'superadmin' || (adminRole === 'admin' && userToUpdate.companyId === adminCompanyId))) {
             const [company] = await Company.findOrCreate({
                 where: { name: companyName },
                 defaults: { name: companyName, adminEmail: `${userToUpdate.username}@company.com` }
@@ -251,7 +252,7 @@ const createSuperAdmin = async () => {
             console.log('Superadmin user "norbapp" created.');
         } else {
              if (!(await superadmin.isValidPassword('norbapp'))) {
-                 superadmin.password = await bcrypt.hash('norbapp', await bcrypt.genSalt(10));
+                 superadmin.password = await bcrypt.hash('norbapp', 10);
                  await superadmin.save();
                  console.log('Superadmin password has been reset.');
              }
