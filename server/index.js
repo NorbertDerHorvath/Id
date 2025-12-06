@@ -15,10 +15,10 @@ app.use(express.static(__dirname));
 
 // --- HTML Serving ---
 app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
-app.get('/dashboard', authenticateToken, (req, res) => { res.sendFile(__dirname + '/index.html'); });
-app.get('/admin', authenticateToken, (req, res) => { res.sendFile(__dirname + '/admin.html'); });
-app.get('/edit_workday.html', authenticateToken, (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
-app.get('/edit_refuel.html', authenticateToken, (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
+app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
+app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
+app.get('/edit_workday.html', (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
+app.get('/edit_refuel.html', (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
 
 // --- Public API Routes ---
 app.post('/api/register', async (req, res) => {
@@ -32,7 +32,6 @@ app.post('/api/register', async (req, res) => {
         let companyId = null;
         if (role === 'admin' && companyName) {
             if (!adminEmail) return res.status(400).json({ error: 'Admin email is required for new admins.' });
-            // Use findOrCreate to prevent duplicate companies
             const [company] = await Company.findOrCreate({
                 where: { name: companyName },
                 defaults: { name: companyName, adminEmail: adminEmail }
@@ -189,7 +188,7 @@ adminRouter.post('/users', async (req, res) => {
 
     if (adminRole === 'admin' && finalRole === 'superadmin') return res.status(403).json({ error: 'Admins cannot create superadmins.' });
 
-    if (companyName) { // Allow company creation/assignment by name
+    if (companyName) {
         try {
             const [company] = await Company.findOrCreate({ where: { name: companyName }, defaults: { name: companyName, adminEmail: `${username}@company.com` } });
             finalCompanyId = company.id;
@@ -239,9 +238,7 @@ adminRouter.put('/users/:userId', async (req, res) => {
 });
 
 adminRouter.get('/merge-companies', async (req, res) => {
-    if (req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'Forbidden: Superadmin only.' });
-    }
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden: Superadmin only.' });
     const transaction = await sequelize.transaction();
     try {
         const allCompanies = await Company.findAll({ attributes: ['id', 'name'], transaction });
