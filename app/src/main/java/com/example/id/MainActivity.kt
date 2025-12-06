@@ -37,6 +37,10 @@ fun AppNavigation() {
     val mainViewModel: MainViewModel = hiltViewModel()
     val loginState by mainViewModel.loginState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        mainViewModel.synchronizeWithServer()
+    }
+
     // Start destination depends on whether the user is already logged in
     val startDestination = if (loginState is LoginUiState.Success) "main" else "login"
 

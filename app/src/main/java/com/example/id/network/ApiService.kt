@@ -41,6 +41,9 @@ interface ApiService {
     @PUT("api/workday-events/{id}")
     suspend fun updateWorkday(@Path("id") id: Long, @Body workday: WorkdayEvent): Response<WorkdayEvent>
 
+    @DELETE("api/workday-events/{id}")
+    suspend fun deleteWorkday(@Path("id") id: Long): Response<Void>
+
     @GET("api/refuel-events")
     suspend fun getRefuelEvents(): Response<List<RefuelEvent>>
 
@@ -50,6 +53,9 @@ interface ApiService {
     @PUT("api/refuel-events/{id}")
     suspend fun updateRefuel(@Path("id") id: Long, @Body refuel: RefuelEvent): Response<RefuelEvent>
 
+    @DELETE("api/refuel-events/{id}")
+    suspend fun deleteRefuel(@Path("id") id: Long): Response<Void>
+
     @GET("api/loading-events")
     suspend fun getLoadingEvents(): Response<List<LoadingEvent>>
 
@@ -58,6 +64,9 @@ interface ApiService {
 
     @PUT("api/loading-events/{id}")
     suspend fun updateLoading(@Path("id") id: Long, @Body loading: LoadingEvent): Response<LoadingEvent>
+
+    @DELETE("api/loading-events/{id}")
+    suspend fun deleteLoading(@Path("id") id: Long): Response<Void>
 
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>

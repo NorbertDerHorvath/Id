@@ -88,8 +88,8 @@ fun ManualDataEntryScreen(navController: NavController, viewModel: MainViewModel
 
 @Composable
 fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel: MainViewModel) {
-    val dateTimeFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.GERMAN) }
-    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd", Locale.GERMAN) }
+    val dateTimeFormat = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN) }
 
     Card(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray)) {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -147,7 +147,7 @@ fun WorkdayItemCard(navController: NavController, event: WorkdayEvent, viewModel
 
 @Composable
 fun RefuelItemCard(navController: NavController, event: RefuelEvent, viewModel: MainViewModel) {
-    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.GERMAN) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN) }
     Card(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray)) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(stringResource(R.string.refueling), style = MaterialTheme.typography.titleMedium)
@@ -167,7 +167,7 @@ fun RefuelItemCard(navController: NavController, event: RefuelEvent, viewModel: 
 
 @Composable
 fun LoadingItemCard(navController: NavController, event: LoadingEvent, viewModel: MainViewModel) {
-    val dateFormat = remember { SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.GERMAN) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN) }
     Card(modifier = Modifier.fillMaxWidth().border(1.dp, Color.LightGray)) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(stringResource(R.string.loading), style = MaterialTheme.typography.titleMedium)

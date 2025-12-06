@@ -51,10 +51,13 @@ interface RefuelEventDao {
     @Query("UPDATE refuel_events SET isSynced = 1 WHERE localId = :id")
     suspend fun setRefuelEventSynced(id: Long)
 
+    @Query("DELETE FROM refuel_events")
+    suspend fun clearAll()
+
     @Transaction
     suspend fun replaceRefuelEvent(oldId: Long, newEvent: RefuelEvent) {
         deleteRefuelEventById(oldId)
-        insertRefuelEvents(listOf(newEvent))
+        insertRefuelEvent(newEvent.copy(localId = 0))
     }
 
     @Query("DELETE FROM refuel_events WHERE isSynced = 1")
@@ -62,4 +65,10 @@ interface RefuelEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRefuelEvents(events: List<RefuelEvent>)
+
+    @Transaction
+    suspend fun syncRefuelEvents(serverEvents: List<RefuelEvent>) {
+        clearSyncedData()
+        insertRefuelEvents(serverEvents.map { it.copy(isSynced = true) })
+    }
 }

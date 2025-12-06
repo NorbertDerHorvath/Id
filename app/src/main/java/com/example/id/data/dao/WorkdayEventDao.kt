@@ -42,7 +42,7 @@ interface WorkdayEventDao {
     @Query("DELETE FROM workday_events WHERE localId = :id")
     suspend fun deleteWorkdayEventById(id: Long?)
 
-    @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'" )
+    @Query("SELECT * FROM workday_events WHERE userId = :userId AND carPlate LIKE '%' || :carPlate || '%'")
     fun getWorkdayEventsByPlate(userId: String, carPlate: String): Flow<List<WorkdayEvent>>
 
     @Query("SELECT * FROM workday_events WHERE userId = :userId AND startTime >= :sevenDaysAgo ORDER BY startTime DESC")
@@ -54,10 +54,13 @@ interface WorkdayEventDao {
     @Query("UPDATE workday_events SET isSynced = 1 WHERE localId = :id")
     suspend fun setWorkdayEventSynced(id: Long)
 
+    @Query("DELETE FROM workday_events")
+    suspend fun clearAll()
+
     @Transaction
     suspend fun replaceWorkdayEvent(oldId: Long, newEvent: WorkdayEvent) {
         deleteWorkdayEventById(oldId)
-        insertWorkdayEvent(newEvent.copy(id = 0))
+        insertWorkdayEvent(newEvent.copy(localId = 0))
     }
 
     @Query("DELETE FROM workday_events WHERE isSynced = 1")
@@ -65,4 +68,10 @@ interface WorkdayEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkdayEvents(events: List<WorkdayEvent>)
+
+    @Transaction
+    suspend fun syncWorkdayEvents(serverEvents: List<WorkdayEvent>) {
+        clearSyncedData()
+        insertWorkdayEvents(serverEvents.map { it.copy(isSynced = true) })
+    }
 }

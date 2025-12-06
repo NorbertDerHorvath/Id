@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Munkanap szerkesztése</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .form-container { max-width: 500px; margin: auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 15px; border-radius: 3px; border: none; color: white; cursor: pointer; }
+        .save-btn { background-color: #4CAF50; }
+        .cancel-btn { background-color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>Munkanap szerkesztése</h1>
+        <form id="edit-workday-form">
+            <div class="form-group">
+                <label for="startTime">Munkaidő kezdete:</label>
+                <input type="datetime-local" id="startTime" name="startTime" required>
+            </div>
+            <div class="form-group">
+                <label for="startLocation">Városa (kezdet):</label>
+                <input type="text" id="startLocation" name="startLocation">
+            </div>
+            <div class="form-group">
+                <label for="endTime">Munkaidő vége:</label>
+                <input type="datetime-local" id="endTime" name="endTime">
+            </div>
+            <div class="form-group">
+                <label for="endLocation">Városa (vége):</label>
+                <input type="text" id="endLocation" name="endLocation">
+            </div>
+            <div class="form-group">
+                <label for="breakTime">Szünet (perc):</label>
+                <input type="number" id="breakTime" name="breakTime">
+            </div>
+            <div class="form-group">
+                <label for="startOdometer">Kezdő km állás:</label>
+                <input type="number" id="startOdometer" name="startOdometer">
+            </div>
+            <div class="form-group">
+                <label for="endOdometer">Záró km állás:</label>
+                <input type="number" id="endOdometer" name="endOdometer">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="save-btn">Mentés</button>
+                <button type="button" class="cancel-btn" onclick="window.location.href='/'">Mégse</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const form = document.getElementById('edit-workday-form');
+            const urlParams = new URLSearchParams(window.location.search);
+            const workdayId = urlParams.get('id');
+
+            if (!workdayId) {
+                alert('Nincs munkanap azonosító megadva!');
+                window.location.href = '/';
+                return;
+            }
+
+            // Fetch existing data
+            try {
+                const response = await fetch(`/api/workday-events/${workdayId}`);
+                if (!response.ok) throw new Error('A munkanap betöltése nem sikerült.');
+                const event = await response.json();
+
+                // Populate form
+                document.getElementById('startTime').value = toLocalISOString(new Date(event.startTime));
+                document.getElementById('startLocation').value = event.startLocation || '';
+                document.getElementById('endTime').value = event.endTime ? toLocalISOString(new Date(event.endTime)) : '';
+                document.getElementById('endLocation').value = event.endLocation || '';
+                document.getElementById('breakTime').value = event.breakTime || 0;
+                document.getElementById('startOdometer').value = event.startOdometer || '';
+                document.getElementById('endOdometer').value = event.endOdometer || '';
+            } catch (error) {
+                alert(error.message);
+                console.error('Hiba a betöltéskor:', error);
+            }
+
+            // Handle form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = {
+                    startTime: document.getElementById('startTime').value,
+                    startLocation: document.getElementById('startLocation').value,
+                    endTime: document.getElementById('endTime').value || null,
+                    endLocation: document.getElementById('endLocation').value,
+                    breakTime: parseInt(document.getElementById('breakTime').value, 10),
+                    startOdometer: parseInt(document.getElementById('startOdometer').value, 10),
+                    endOdometer: parseInt(document.getElementById('endOdometer').value, 10),
+                };
+
+                try {
+                    const response = await fetch(`/api/workday-events/${workdayId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'A mentés nem sikerült.');
+                    }
+                    
+                    alert('Sikeres mentés!');
+                    window.location.href = '/'; // Redirect back to the main page
+
+                } catch (error) {
+                    alert(error.message);
+                    console.error('Hiba a mentéskor:', error);
+                }
+            });
+
+            // Helper to format date for datetime-local input
+            function toLocalISOString(date) {
+                const tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
+                const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, -1);
+                return localISOTime.substring(0, 16);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -29,6 +29,7 @@ class SyncWorker @AssistedInject constructor(
         }
 
         return try {
+            // UPLOAD UNSYNCED CHANGES
             // Workday events
             val unsyncedWorkdayEvents = repository.getUnsyncedWorkdayEvents()
             unsyncedWorkdayEvents.forEach { event ->
@@ -94,6 +95,22 @@ class SyncWorker @AssistedInject constructor(
                         }
                     }
                 }
+            }
+
+            // DOWNLOAD CHANGES FROM SERVER
+            val serverWorkdays = apiService.getWorkdayEvents()
+            if (serverWorkdays.isSuccessful) {
+                repository.syncWorkdayEvents(serverWorkdays.body() ?: emptyList())
+            }
+
+            val serverRefuels = apiService.getRefuelEvents()
+            if (serverRefuels.isSuccessful) {
+                repository.syncRefuelEvents(serverRefuels.body() ?: emptyList())
+            }
+
+            val serverLoadings = apiService.getLoadingEvents()
+            if (serverLoadings.isSuccessful) {
+                repository.syncLoadingEvents(serverLoadings.body() ?: emptyList())
             }
 
             Result.success()

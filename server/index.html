@@ -18,6 +18,7 @@
             border-radius: 3px;
             color: white;
             text-decoration: none;
+            margin-right: 5px;
         }
         .edit-btn { background-color: #4CAF50; }
         .delete-btn { background-color: #f44336; }
@@ -40,14 +41,11 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Function to fetch data and render a table
             const fetchData = async (endpoint, elementId, columns, isWorkday = false) => {
                 const targetElement = document.getElementById(elementId);
                 try {
                     const response = await fetch(`/api/${endpoint}`);
-                    if (!response.ok) {
-                        throw new Error(`Network response was not ok: ${response.statusText}`);
-                    }
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
                     const data = await response.json();
 
                     if (data.length === 0) {
@@ -57,9 +55,7 @@
 
                     let table = '<table><thead><tr>';
                     columns.forEach(col => table += `<th>${col.header}</th>`);
-                    if (isWorkday) {
-                        table += '<th>Műveletek</th>';
-                    }
+                    if (isWorkday) table += '<th>Műveletek</th>';
                     table += '</tr></thead><tbody>';
 
                     data.forEach(item => {
@@ -85,6 +81,8 @@
                                 } else {
                                     value = 'N/A';
                                 }
+                            } else if (col.key.includes('Time')) {
+                                value = item[col.key] ? new Date(item[col.key]).toLocaleString('hu-HU', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A';
                             } else {
                                 value = col.key.split('.').reduce((o, i) => o ? o[i] : '', item);
                             }
@@ -104,7 +102,6 @@
 
                 } catch (error) {
                     targetElement.innerHTML = `<p style="color: red;">Hiba a betöltés közben: ${error.message}</p>`;
-                    console.error('Fetch error:', error);
                 }
             };
 
@@ -112,29 +109,26 @@
                 const targetElement = document.getElementById('last-login');
                 try {
                     const response = await fetch('/api/last-login');
-                    if (!response.ok) {
-                        throw new Error(`Network response was not ok: ${response.statusText}`);
-                    }
+                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
                     const data = await response.json();
-                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${data.time || 'N/A'}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
+                    const loginTime = data.time ? new Date(data.time).toLocaleString('hu-HU') : 'N/A';
+                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${loginTime}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
                 } catch (error) {
                     targetElement.innerHTML = `<p style="color: red;">Hiba a betöltés közben: ${error.message}</p>`;
-                    console.error('Fetch error:', error);
                 }
             };
 
-            // Define columns for each table
             const workdayColumns = [
-                { header: 'Felhasználó neve', key: 'User.username' },
+                { header: 'Felhasználó', key: 'User.username' },
                 { header: 'Munkaidő kezdete', key: 'startTime' },
                 { header: 'Városa', key: 'startLocation' },
                 { header: 'Munkaidő vége', key: 'endTime' },
                 { header: 'Városa', key: 'endLocation' },
                 { header: 'Összes netto munkaidő', key: 'netWorkTime' },
-                { header: 'Összes szünet', key: 'breakTime' },
-                { header: 'Kezdő km állás', key: 'startOdometer' },
-                { header: 'Záró km állás', key: 'endOdometer' },
-                { header: 'Összes megtett km', key: 'totalKm' },
+                { header: 'Összes szünet (perc)', key: 'breakTime' },
+                { header: 'Kezdő km', key: 'startOdometer' },
+                { header: 'Záró km', key: 'endOdometer' },
+                { header: 'Megtett km', key: 'totalKm' },
             ];
 
             const refuelColumns = [
@@ -154,22 +148,19 @@
             ];
             
             window.editWorkday = (id) => {
-                // Implement edit functionality, e.g., redirect to an edit page
-                console.log('Edit workday with id:', id);
+                window.location.href = `/edit_workday.html?id=${id}`;
             };
 
-            window.deleteWorkday = (id) => {
-                // Implement delete functionality
+            window.deleteWorkday = async (id) => {
                 if (confirm('Biztosan törölni szeretné ezt a munkanapot?')) {
-                    fetch(`/api/workday-events/${id}`, { method: 'DELETE' })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('A törlés nem sikerült.');
-                            }
-                            // Refresh the data after deletion
-                            fetchAllData();
-                        })
-                        .catch(error => console.error('Hiba a törlés közben:', error));
+                    try {
+                        const response = await fetch(`/api/workday-events/${id}`, { method: 'DELETE' });
+                        if (!response.ok)  throw new Error('A törlés nem sikerült.');
+                        fetchAllData(); // Refresh data
+                    } catch(error) {
+                         alert(error.message);
+                         console.error('Hiba a törlés közben:', error);
+                    }
                 }
             };
 
@@ -180,7 +171,6 @@
                 fetchData('loading-events', 'loading-events', loadingColumns);
             };
 
-            // Fetch all data initially and then every 5 seconds
             fetchAllData();
             setInterval(fetchAllData, 5000);
         });

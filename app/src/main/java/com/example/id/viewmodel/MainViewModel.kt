@@ -453,21 +453,21 @@ class MainViewModel @Inject constructor(
     fun deleteWorkday(id: Long) {
         viewModelScope.launch {
             repository.deleteWorkdayEventById(id)
-            // TODO: Add deletion sync to server if needed
+            triggerSync()
         }
     }
 
     fun deleteRefuel(id: Long) {
         viewModelScope.launch {
             repository.deleteRefuelEventById(id)
-            // TODO: Add deletion sync to server if needed
+            triggerSync()
         }
     }
 
     fun deleteLoading(id: Long) {
         viewModelScope.launch {
             repository.deleteLoadingEventById(id)
-            // TODO: Add deletion sync to server if needed
+            triggerSync()
         }
     }
 
@@ -514,6 +514,10 @@ class MainViewModel @Inject constructor(
     private fun triggerSync() {
         val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
         workManager.enqueue(syncRequest)
+    }
+
+    fun synchronizeWithServer() {
+        triggerSync()
     }
 
     fun formatDuration(millis: Long): String {

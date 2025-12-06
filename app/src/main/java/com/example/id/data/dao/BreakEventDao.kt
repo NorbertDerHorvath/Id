@@ -2,7 +2,9 @@ package com.example.id.data.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.id.data.entities.BreakEvent
 import kotlinx.coroutines.flow.Flow
@@ -29,4 +31,19 @@ interface BreakEventDao {
 
     @Query("UPDATE break_events SET isSynced = 1 WHERE id = :id")
     suspend fun setBreakEventSynced(id: Long)
+
+    @Query("DELETE FROM break_events")
+    suspend fun clearAll()
+
+    @Query("DELETE FROM break_events WHERE isSynced = 1")
+    suspend fun clearSyncedData()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBreakEvents(events: List<BreakEvent>)
+
+    @Transaction
+    suspend fun syncBreakEvents(serverEvents: List<BreakEvent>) {
+        clearSyncedData()
+        insertBreakEvents(serverEvents.map { it.copy(isSynced = true) })
+    }
 }

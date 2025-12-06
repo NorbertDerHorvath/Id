@@ -190,98 +190,32 @@ class AppRepository @Inject constructor(
         return workdayEventDao.getUnsyncedWorkdayEvents()
     }
 
-    suspend fun setWorkdayEventSynced(id: Long) {
-        workdayEventDao.setWorkdayEventSynced(id)
-    }
-
     suspend fun getUnsyncedRefuelEvents(): List<RefuelEvent> {
         return refuelEventDao.getUnsyncedRefuelEvents()
-    }
-
-    suspend fun setRefuelEventSynced(id: Long) {
-        refuelEventDao.setRefuelEventSynced(id)
     }
 
     suspend fun getUnsyncedLoadingEvents(): List<LoadingEvent> {
         return loadingEventDao.getUnsyncedLoadingEvents()
     }
 
-    suspend fun setLoadingEventSynced(id: Long) {
-        loadingEventDao.setLoadingEventSynced(id)
+    suspend fun syncWorkdayEvents(serverEvents: List<WorkdayEvent>) {
+        workdayEventDao.syncWorkdayEvents(serverEvents)
+    }
+
+    suspend fun syncRefuelEvents(serverEvents: List<RefuelEvent>) {
+        refuelEventDao.syncRefuelEvents(serverEvents)
+    }
+
+    suspend fun syncLoadingEvents(serverEvents: List<LoadingEvent>) {
+        loadingEventDao.syncLoadingEvents(serverEvents)
     }
 
     suspend fun deleteAllData() {
-        apiService.deleteAllData()
-    }
-
-    suspend fun clearSyncedData() {
-        workdayEventDao.clearSyncedData()
-        refuelEventDao.clearSyncedData()
-        loadingEventDao.clearSyncedData()
-    }
-
-    suspend fun insertWorkdayEvents(events: List<WorkdayEvent>) {
-        workdayEventDao.insertWorkdayEvents(events)
-    }
-
-    suspend fun insertRefuelEvents(events: List<RefuelEvent>) {
-        refuelEventDao.insertRefuelEvents(events)
-    }
-
-    suspend fun insertLoadingEvents(events: List<LoadingEvent>) {
-        loadingEventDao.insertLoadingEvents(events)
-    }
-
-    suspend fun syncData() {
-        // 1. Fetch all events from the server
-        val workdayEventsResponse = apiService.getWorkdayEvents()
-        val refuelEventsResponse = apiService.getRefuelEvents()
-        val loadingEventsResponse = apiService.getLoadingEvents()
-
-        if (workdayEventsResponse.isSuccessful && refuelEventsResponse.isSuccessful && loadingEventsResponse.isSuccessful) {
-            val serverWorkdayEvents = workdayEventsResponse.body() ?: emptyList()
-            val serverRefuelEvents = refuelEventsResponse.body() ?: emptyList()
-            val serverLoadingEvents = loadingEventsResponse.body() ?: emptyList()
-
-            // 2. Clear synced data from local database
-            clearSyncedData()
-
-            // 3. Insert server data into local database
-            insertWorkdayEvents(serverWorkdayEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
-            insertRefuelEvents(serverRefuelEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
-            insertLoadingEvents(serverLoadingEvents.map { it.copy(isSynced = true, userId = it.user?.id ?: it.userId) })
-        }
-
-        // 4. Sync unsynced local data
-        getUnsyncedWorkdayEvents().forEach { event ->
-            if (event.endTime != null) {
-                val localId = event.localId
-                val response = apiService.postWorkday(event.copy(id = null))
-                if (response.isSuccessful && response.body() != null) {
-                    val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                    replaceWorkdayEvent(localId, syncedEvent)
-                }
-            }
-        }
-
-        getUnsyncedRefuelEvents().forEach { event ->
-            val localId = event.localId
-            val response = apiService.postRefuel(event.copy(id = null))
-            if (response.isSuccessful && response.body() != null) {
-                val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                replaceRefuelEvent(localId, syncedEvent)
-            }
-        }
-
-        getUnsyncedLoadingEvents().forEach { event ->
-            if (event.endTime != null) {
-                val localId = event.localId
-                val response = apiService.postLoading(event.copy(id = null))
-                if (response.isSuccessful && response.body() != null) {
-                    val syncedEvent = response.body()!!.copy(isSynced = true, userId = response.body()!!.user!!.id)
-                    replaceLoadingEvent(localId, syncedEvent)
-                }
-            }
-        }
+        // This should probably be handled more gracefully, e.g. by a specific server endpoint.
+        // For now, we'll just clear the local DB.
+        workdayEventDao.clearAll()
+        refuelEventDao.clearAll()
+        loadingEventDao.clearAll()
+        breakEventDao.clearAll()
     }
 }

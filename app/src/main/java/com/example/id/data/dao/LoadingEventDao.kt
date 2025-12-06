@@ -51,10 +51,13 @@ interface LoadingEventDao {
     @Query("UPDATE loading_events SET isSynced = 1 WHERE localId = :id")
     suspend fun setLoadingEventSynced(id: Long)
 
+    @Query("DELETE FROM loading_events")
+    suspend fun clearAll()
+
     @Transaction
     suspend fun replaceLoadingEvent(oldId: Long, newEvent: LoadingEvent) {
         deleteLoadingEventById(oldId)
-        insertLoadingEvents(listOf(newEvent))
+        insertLoadingEvent(newEvent.copy(localId = 0))
     }
 
     @Query("DELETE FROM loading_events WHERE isSynced = 1")
@@ -62,4 +65,10 @@ interface LoadingEventDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLoadingEvents(events: List<LoadingEvent>)
+
+    @Transaction
+    suspend fun syncLoadingEvents(serverEvents: List<LoadingEvent>) {
+        clearSyncedData()
+        insertLoadingEvents(serverEvents.map { it.copy(isSynced = true) })
+    }
 }
