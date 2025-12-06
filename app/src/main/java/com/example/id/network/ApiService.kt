@@ -55,7 +55,7 @@ interface ApiService {
 
     @DELETE("api/refuel-events/{id}")
     suspend fun deleteRefuel(@Path("id") id: Long): Response<Void>
-
+/*
     @GET("api/loading-events")
     suspend fun getLoadingEvents(): Response<List<LoadingEvent>>
 
@@ -67,7 +67,7 @@ interface ApiService {
 
     @DELETE("api/loading-events/{id}")
     suspend fun deleteLoading(@Path("id") id: Long): Response<Void>
-
+*/
     @POST("api/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 

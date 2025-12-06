@@ -27,17 +27,11 @@
 <body>
     <h1>Szerver Adatbázis Tartalma</h1>
 
-    <h2>Utolsó bejelentkezés</h2>
-    <div id="last-login">Betöltés...</div>
-
     <h2>Munkanapok (Workday Events)</h2>
     <div id="workday-events">Betöltés...</div>
 
     <h2>Tankolások (Refuel Events)</h2>
     <div id="refuel-events">Betöltés...</div>
-
-    <h2>Rakodások (Loading Events)</h2>
-    <div id="loading-events">Betöltés...</div>
 
     <script>
         // Helper to format date as dd.mm.yyyy hh:mm
@@ -123,20 +117,9 @@
                 }
             };
 
-            const fetchLastLogin = async () => {
-                const targetElement = document.getElementById('last-login');
-                try {
-                    const response = await fetch('/api/last-login');
-                    if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
-                    const data = await response.json();
-                    targetElement.innerHTML = `<p><strong>Időpont:</strong> ${formatHuDate(data.time)}</p><p><strong>Hely:</strong> ${data.location || 'N/A'}</p>`;
-                } catch (error) {
-                    targetElement.innerHTML = `<p style="color: red;">Hiba a betöltés közben: ${error.message}</p>`;
-                }
-            };
-
             const workdayColumns = [
                 { header: 'Felhasználó', key: 'User.username' },
+                { header: 'Rendszám', key: 'carPlate' },
                 { header: 'Munkaidő kezdete', key: 'startTime' },
                 { header: 'Városa', key: 'startLocation' },
                 { header: 'Munkaidő vége', key: 'endTime' },
@@ -157,12 +140,6 @@
                 { header: 'Fizetési mód', key: 'paymentMethod' },
                 { header: 'Rendszám', key: 'carPlate' },
             ];
-
-            const loadingColumns = [
-                { header: 'Felhasználó', key: 'User.username' },
-                { header: 'Időpont', key: 'timestamp' },
-                { header: 'Leírás', key: 'description' },
-            ];
             
             window.editWorkday = (id) => {
                 window.location.href = `/edit_workday.html?id=${id}`;
@@ -182,10 +159,8 @@
             };
 
             const fetchAllData = () => {
-                fetchLastLogin();
                 fetchData('workday-events', 'workday-events', workdayColumns, true);
                 fetchData('refuel-events', 'refuel-events', refuelColumns);
-                fetchData('loading-events', 'loading-events', loadingColumns);
             };
 
             fetchAllData();

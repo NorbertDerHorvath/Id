@@ -27,6 +27,7 @@ import com.example.id.ui.theme.IdTheme
 import com.example.id.viewmodel.LoginUiState
 import com.example.id.viewmodel.MainViewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
 fun PermissionWrapper() {
     val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
-    if (locationPermissionState.hasPermission) {
+    if (locationPermissionState.status.isGranted) {
         AppNavigation()
     } else {
         Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {

@@ -73,6 +73,7 @@ app.get('/api/validate-token', authenticateToken, (req, res) => {
     res.json({ valid: true });
 });
 
+/*
 app.get('/api/last-login', async (req, res) => {
   try {
     const user = await User.findOne({ order: [['lastLoginTime', 'DESC']] });
@@ -85,6 +86,7 @@ app.get('/api/last-login', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch last login.' });
   }
 });
+*/
 
 // --- Data API Routes (Protected or Public as needed) ---
 
@@ -161,7 +163,80 @@ app.get('/api/refuel-events', async (req, res) => {
   }
 });
 
-// ... (rest of the API routes for refuel, loading, etc.)
+app.post('/api/refuel-events', authenticateToken, async (req, res) => {
+    try {
+        const { ...eventData } = req.body;
+        const event = await RefuelEvent.create({ ...eventData, userId: req.user.userId });
+        const newEvent = await RefuelEvent.findByPk(event.id, { include: User });
+        res.status(201).json(newEvent);
+    } catch (error) {
+        console.error("Error saving refuel event:", error);
+        res.status(500).json({ error: 'Failed to save refuel event.' });
+    }
+});
+
+app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await RefuelEvent.findByPk(req.params.id);
+        if (event) {
+            // Ensure the user is updating their own event or is an admin
+            if (event.userId !== req.user.userId && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+            const { id, ...eventData } = req.body;
+            await event.update(eventData);
+            const updatedEvent = await RefuelEvent.findByPk(req.params.id, { include: User });
+            res.json(updatedEvent);
+        } else {
+            res.status(404).json({ error: 'RefuelEvent not found' });
+        }
+    } catch (error) {
+        console.error("Error updating refuel event:", error);
+        res.status(500).json({ error: 'Failed to update refuel event.' });
+    }
+});
+
+/*
+// Loading Events
+app.get('/api/loading-events', async (req, res) => {
+  try {
+    const events = await LoadingEvent.findAll({ include: User, order: [['startTime', 'DESC']] });
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch loading events.' });
+  }
+});
+
+app.post('/api/loading-events', authenticateToken, async (req, res) => {
+    try {
+        const { id, ...eventData } = req.body;
+        const event = await LoadingEvent.create({ ...eventData, userId: req.user.userId });
+        const newEvent = await LoadingEvent.findByPk(event.id, { include: User });
+        res.status(201).json(newEvent);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to save loading event.' });
+    }
+});
+
+app.put('/api/loading-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const event = await LoadingEvent.findByPk(req.params.id);
+        if (event) {
+             if (event.userId !== req.user.userId && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+            const { id, ...eventData } = req.body;
+            await event.update(eventData);
+            const updatedEvent = await LoadingEvent.findByPk(req.params.id, { include: User });
+            res.json(updatedEvent);
+        } else {
+            res.status(404).json({ error: 'LoadingEvent not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update loading event.' });
+    }
+});
+*/
 
 // Start server and sync database
 app.listen(PORT, async () => {

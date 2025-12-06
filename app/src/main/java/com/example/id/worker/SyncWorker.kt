@@ -73,7 +73,7 @@ class SyncWorker @AssistedInject constructor(
                     }
                 }
             }
-
+/*
             // Loading events
             val unsyncedLoadingEvents = repository.getUnsyncedLoadingEvents()
             unsyncedLoadingEvents.forEach { event ->
@@ -96,7 +96,7 @@ class SyncWorker @AssistedInject constructor(
                     }
                 }
             }
-
+*/
             // DOWNLOAD CHANGES FROM SERVER
             val serverWorkdays = apiService.getWorkdayEvents()
             if (serverWorkdays.isSuccessful) {
@@ -107,12 +107,12 @@ class SyncWorker @AssistedInject constructor(
             if (serverRefuels.isSuccessful) {
                 repository.syncRefuelEvents(serverRefuels.body() ?: emptyList())
             }
-
+/*
             val serverLoadings = apiService.getLoadingEvents()
             if (serverLoadings.isSuccessful) {
                 repository.syncLoadingEvents(serverLoadings.body() ?: emptyList())
             }
-
+*/
             Result.success()
         } catch (e: Exception) {
             Log.e("SyncWorker", "Sync failed", e)
