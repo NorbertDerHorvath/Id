@@ -102,6 +102,10 @@ class MainViewModel @Inject constructor(
     private val _recentWorkdays = MutableStateFlow<List<WorkdayEvent>>(emptyList())
     val recentWorkdays: StateFlow<List<WorkdayEvent>> = _recentWorkdays.asStateFlow()
 
+    private var lastWorkdayQuery: Triple<String, String, String?>? = null
+    private var lastRefuelQuery: Triple<String, String, String?>? = null
+    private var lastQueryType: String? = null
+
     init {
         initialize()
     }
@@ -494,7 +498,18 @@ class MainViewModel @Inject constructor(
         _refuelQueryResults.value = emptyList()
     }
 
+    fun refreshLastQuery() {
+        viewModelScope.launch {
+            when (lastQueryType) {
+                "workday" -> lastWorkdayQuery?.let { queryWorkdays(it.first, it.second, it.third) }
+                "refuel" -> lastRefuelQuery?.let { queryRefuels(it.first, it.second, it.third) }
+            }
+        }
+    }
+
     fun queryWorkdays(startDate: String, endDate: String, carPlate: String?) {
+        lastWorkdayQuery = Triple(startDate, endDate, carPlate)
+        lastQueryType = "workday"
         viewModelScope.launch {
             try {
                 val response = apiService.getWorkdayEvents(startDate, endDate, carPlate)
@@ -508,6 +523,8 @@ class MainViewModel @Inject constructor(
     }
 
     fun queryRefuels(startDate: String, endDate: String, carPlate: String?) {
+        lastRefuelQuery = Triple(startDate, endDate, carPlate)
+        lastQueryType = "refuel"
         viewModelScope.launch {
             try {
                 val response = apiService.getRefuelEvents(startDate, endDate, carPlate)
@@ -520,21 +537,17 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private suspend fun synchronizeAndWait() {
-        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
-        workManager.enqueue(syncRequest)
-        workManager.getWorkInfoByIdFlow(syncRequest.id)
-            .filter { it.state.isFinished }
-            .first()
-    }
-
     private fun triggerSync() {
         val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>().build()
         workManager.enqueue(syncRequest)
     }
 
     fun synchronizeWithServer() {
-        triggerSync()
+        viewModelScope.launch {
+            triggerSync()
+            delay(1000) //TODO: find a better way
+            refreshLastQuery()
+        }
     }
 
     fun formatDuration(millis: Long): String {

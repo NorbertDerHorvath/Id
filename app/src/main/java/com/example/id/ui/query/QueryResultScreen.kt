@@ -58,7 +58,7 @@ fun QueryResultScreen(
                 Text("Vissza")
             }
             Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { viewModel.synchronizeWithServer() }) {
+            Button(onClick = { viewModel.refreshLastQuery() }) {
                 Text("Frissítés")
             }
         }
