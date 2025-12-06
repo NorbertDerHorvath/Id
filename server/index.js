@@ -115,82 +115,30 @@ app.get('/api/validate-token', authenticateToken, (req, res) => {
     res.json({ valid: true });
 });
 
-// --- Data API Routes (Protected) ---
-
-const canAccessResource = (model) => async (req, res, next) => {
-    const { id } = req.params;
-    const { userId, role, companyId } = req.user;
-
-    try {
-        const resource = await model.findByPk(id);
-        if (!resource) {
-            return res.status(404).json({ error: 'Resource not found' });
-        }
-        if (role === 'superadmin') return next();
-        if (role === 'user' && resource.userId === userId) return next();
-        if (role === 'admin') {
-            const resourceOwner = await User.findByPk(resource.userId);
-            if (resourceOwner && resourceOwner.companyId === companyId) return next();
-        }
-        return res.status(403).json({ error: 'Forbidden: You do not have access to this resource.' });
-    } catch (error) {
-        console.error('Authorization error:', error);
-        return res.status(500).json({ error: 'Server error during authorization.' });
-    }
-};
-
-// Workday Events
-app.get('/api/workday-events', authenticateToken, async (req, res) => {
-    try {
-        const { startDate, endDate, carPlate } = req.query;
-        const { userId, role, companyId } = req.user;
-        const whereClause = {};
-
-        if (startDate && endDate) { whereClause.startTime = { [Op.between]: [new Date(startDate), new Date(endDate)] }; }
-        if (carPlate) { whereClause.carPlate = { [Op.iLike]: `%${carPlate}%` }; }
-
-        if (role === 'user') {
-            whereClause.userId = userId;
-        } else if (role === 'admin') {
-            const usersInCompany = await User.findAll({ where: { companyId }, attributes: ['id'] });
-            whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
-        } 
-        const events = await WorkdayEvent.findAll({ where: whereClause, include: User, order: [['startTime', 'DESC']] });
-        res.json(events);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch workday events.' });
-    }
-});
 
 // --- Admin Routes ---
 const adminRouter = express.Router();
-adminRouter.use(authenticateToken, isAdminOrSuperAdmin);
-
-function isAdminOrSuperAdmin(req, res, next) {
+adminRouter.use(authenticateToken, (req, res, next) => {
     if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Forbidden: Admins or Superadmin only.' });
     }
     next();
-};
+});
 
 adminRouter.get('/users', async (req, res) => {
-    const { userId, companyId, role } = req.user;
+    const { companyId, role } = req.user;
     try {
         const queryOptions = {
             attributes: { exclude: ['password'] },
-            include: { model: Company, attributes: ['name'] }
+            include: { model: Company, attributes: ['name'] },
+            order: [['username', 'ASC']]
         };
 
         if (role === 'admin') {
             queryOptions.where = {
                 companyId: companyId,
-                [Op.or]: [
-                    { role: 'user' },
-                    { id: userId } // Include the admin themselves
-                ]
+                role: {[Op.ne]: 'superadmin'} // Admins cannot see superadmins
             };
-        } else { // superadmin
-            // No filter, superadmin sees all
         }
 
         res.json(await User.findAll(queryOptions));
@@ -201,21 +149,19 @@ adminRouter.get('/users', async (req, res) => {
 });
 
 adminRouter.post('/users', async (req, res) => {
-    const { username, password, role, permissions, companyId, companyName, realName } = req.body;
-    const { role: adminRole } = req.user;
+    const { username, password, role, companyName, realName } = req.body;
+    const { role: adminRole, companyId: adminCompanyId } = req.user;
 
     if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
 
-    let finalCompanyId = companyId;
+    let finalCompanyId = adminRole === 'admin' ? adminCompanyId : null;
+    let finalRole = role || 'user';
 
-    if (adminRole === 'admin') {
-        if (role && role !== 'user') {
-             return res.status(403).json({ error: 'Admins can only create users.' });
-        }
-        finalCompanyId = req.user.companyId;
+    if (adminRole === 'admin' && finalRole === 'superadmin') {
+         return res.status(403).json({ error: 'Admins cannot create superadmins.' });
     }
 
-    if (adminRole === 'superadmin' && role === 'admin' && companyName) {
+    if (adminRole === 'superadmin' && companyName) {
         try {
             const [company] = await Company.findOrCreate({
                 where: { name: companyName }, 
@@ -227,7 +173,7 @@ adminRouter.post('/users', async (req, res) => {
         }
     }
 
-    if (!finalCompanyId && role !== 'superadmin') {
+    if (!finalCompanyId && finalRole !== 'superadmin') {
         return res.status(400).json({ error: 'Company assignment is required.' });
     }
 
@@ -236,9 +182,8 @@ adminRouter.post('/users', async (req, res) => {
             username, 
             password, 
             realName,
-            role: role || 'user', 
+            role: finalRole, 
             companyId: finalCompanyId, 
-            permissions 
         });
         const { password: _, ...userResponse } = newUser.get({ plain: true });
         res.status(201).json({ message: 'User created successfully', user: userResponse });
@@ -251,29 +196,41 @@ adminRouter.post('/users', async (req, res) => {
 
 adminRouter.put('/users/:userId', async (req, res) => {
     const { userId: targetUserId } = req.params;
-    const { password, role, permissions, realName } = req.body;
+    const { password, role, realName, companyName } = req.body;
     const { companyId: adminCompanyId, role: adminRole } = req.user;
 
     try {
         const userToUpdate = await User.findByPk(targetUserId);
         if (!userToUpdate) return res.status(404).json({ error: 'User not found.' });
 
+        // Security check: No one can edit a superadmin except another superadmin (or themselves)
+        if (userToUpdate.role === 'superadmin' && adminRole !== 'superadmin') {
+            return res.status(403).json({ error: 'You do not have permission to edit a superadmin.'});
+        }
+
+        // Admin specific rules
         if (adminRole === 'admin') {
             if (userToUpdate.companyId !== adminCompanyId) {
                 return res.status(403).json({ error: 'Forbidden: You can only edit users in your own company.' });
             }
-            if (role && userToUpdate.id !== req.user.userId) { // Admins can't change roles of others
-                return res.status(403).json({ error: 'Admins cannot change roles.' });
+            if (role === 'superadmin') { // Admins cannot promote to superadmin
+                return res.status(403).json({ error: 'Admins cannot assign superadmin role.' });
             }
         }
 
-        if (password) {
-            userToUpdate.password = await bcrypt.hash(password, await bcrypt.genSalt(10));
-        } 
+        if (password) userToUpdate.password = await bcrypt.hash(password, 10);
         if (realName) userToUpdate.realName = realName;
-        if (role && adminRole === 'superadmin') userToUpdate.role = role;
-        if (permissions) userToUpdate.permissions = permissions;
-
+        if (role) userToUpdate.role = role;
+        
+        // Superadmin can change company by name
+        if (adminRole === 'superadmin' && companyName) {
+            const [company] = await Company.findOrCreate({
+                where: { name: companyName },
+                defaults: { name: companyName, adminEmail: `${userToUpdate.username}@company.com` }
+            });
+            userToUpdate.companyId = company.id;
+        }
+        
         await userToUpdate.save();
         const { password: _, ...userResponse } = userToUpdate.get({ plain: true });
         res.json({ message: 'User updated successfully.', user: userResponse });
@@ -282,7 +239,6 @@ adminRouter.put('/users/:userId', async (req, res) => {
         res.status(500).json({ error: 'Failed to update user.' });
     }
 });
-
 
 app.use('/api/admin', adminRouter);
 
