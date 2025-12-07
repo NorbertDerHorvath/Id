@@ -68,13 +68,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- Edit Workday Modal -->
-    <div class="modal fade" id="editWorkdayModal" tabindex="-1">...</div>
-
-    <!-- Edit Refuel Modal -->
-    <div class="modal fade" id="editRefuelModal" tabindex="-1">...</div>
-
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -130,7 +123,7 @@
         }
         
         async function loadSettings(companyId) {
-             if (!companyId && currentUserRole !== 'superadmin') {
+            if (!companyId && currentUserRole !== 'superadmin') {
                  document.getElementById('main-content').innerHTML = `<div class="alert alert-danger"><b>Error:</b> User is not assigned to a company. Settings cannot be loaded.</div>`;
                  return;
             }
@@ -161,29 +154,114 @@
         function renderHeaders() {
             const workdayHead = document.getElementById('workday-table-head');
             const refuelHead = document.getElementById('refuel-table-head');
-            workdayHead.innerHTML = `<tr><th>User</th><th>Plate</th><th>Start</th><th>End</th><th>Breaks</th><th>Net Time</th><th>Distance</th><th>Actions</th></tr>`;
-            refuelHead.innerHTML = `<tr><th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th><th>Actions</th></tr>`;
+            workdayHead.innerHTML = `<tr><th>User</th><th>Plate</th><th>Start</th><th>End</th><th>Breaks</th><th>Net Time</th><th>Distance</th></tr>`;
+            refuelHead.innerHTML = `<tr><th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th></tr>`;
         }
 
-        async function populateCompanyFilter() { /* ... */ }
-        async function populateUserFilter(companyId) { /* ... */ }
-        async function loadWorkdayEvents() { /* ... */ }
-        async function loadRefuelEvents() { /* ... */ }
+        async function populateCompanyFilter() {
+            try {
+                const res = await fetch('/api/companies', { headers: { 'Authorization': `Bearer ${token}` } });
+                const companies = await res.json();
+                const filter = document.getElementById('company-filter');
+                filter.innerHTML = '<option value="all">All Companies</option>';
+                companies.forEach(c => { filter.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+            } catch(e) { console.error(e); }
+        }
 
-        function openEditModal(eventData, type) {
-            if (type === 'workday') {
-                document.getElementById('edit-workday-id').value = eventData.id;
-                document.getElementById('edit-start-time').value = new Date(eventData.startTime).toISOString().substring(0, 16);
-                document.getElementById('edit-end-time').value = eventData.endTime ? new Date(eventData.endTime).toISOString().substring(0, 16) : '';
-                document.getElementById('edit-car-plate').value = eventData.carPlate || '';
-                // ... populate other fields
-                $('#editWorkdayModal').modal('show');
-            } else if (type === 'refuel') {
-                // ... populate refuel modal fields
-                $('#editRefuelModal').modal('show');
+        async function populateUserFilter(companyId) {
+             try {
+                const res = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
+                allUsers = await res.json();
+                const userFilter = document.getElementById('user-filter');
+                userFilter.innerHTML = '<option value="all">All Users</option>';
+                
+                let usersToList = (currentUserRole === 'superadmin' && !companyId) ? allUsers : allUsers.filter(u => u.companyId === companyId);
+                usersToList.forEach(u => { 
+                    userFilter.innerHTML += `<option value="${u.id}">${u.realName || u.username}</option>`;
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadWorkdayEvents() {
+            const tableBody = document.getElementById('workday-table-body');
+            tableBody.innerHTML = `<tr><td colspan="7" class="text-center">Loading...</td></tr>`;
+            
+            const params = new URLSearchParams();
+            if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
+            if(document.getElementById('end-date').value) params.append('endDate', document.getElementById('end-date').value);
+            if(currentUserRole === 'admin' || currentUserRole === 'superadmin'){
+                if(document.getElementById('user-filter')?.value !== 'all') params.append('userId', document.getElementById('user-filter').value);
+                if(currentUserRole === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') params.append('companyId', document.getElementById('company-filter').value);
             }
+
+            try {
+                const res = await fetch(`/api/workday-events?${params}` , { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch workday events.');
+                const events = await res.json();
+                tableBody.innerHTML = '';
+                if(events.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No data found.</td></tr>';
+                    return;
+                }
+
+                events.forEach(e => {
+                    const start = new Date(e.startTime);
+                    const end = e.endTime ? new Date(e.endTime) : null;
+                    const netTime = end ? (end - start) - (e.breakTime * 60000) : 0;
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${e.User?.realName || e.User?.username}</td>
+                            <td>${e.carPlate || '-'}</td>
+                            <td>${start.toLocaleString()} - ${e.startLocation || '-'} (${e.startOdometer || '-'} km)</td>
+                            <td>${end ? `${end.toLocaleString()} - ${e.endLocation || '-'} (${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
+                            <td>${e.breakTime || 0} min</td>
+                            <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
+                            <td>${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
+                        </tr>
+                    `;
+                });
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${e.message}</td></tr>`; }
         }
 
+        async function loadRefuelEvents() {
+            const tableBody = document.getElementById('refuel-table-body');
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center">Loading...</td></tr>`;
+            const currency = currentSettings.companySettings?.currency || 'Ft';
+            const params = new URLSearchParams();
+             if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
+            if(document.getElementById('end-date').value) params.append('endDate', document.getElementById('end-date').value);
+            if(currentUserRole === 'admin' || currentUserRole === 'superadmin'){
+                if(document.getElementById('user-filter')?.value !== 'all') params.append('userId', document.getElementById('user-filter').value);
+                if(currentUserRole === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') params.append('companyId', document.getElementById('company-filter').value);
+            }
+
+            try {
+                const res = await fetch(`/api/refuel-events?${params}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch refuel events.');
+                const events = await res.json();
+                tableBody.innerHTML = '';
+                if(events.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No data found.</td></tr>';
+                    return;
+                }
+                
+                events.forEach(e => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>${e.User?.realName || e.User?.username}</td>
+                            <td>${new Date(e.timestamp).toLocaleString()}</td>
+                            <td>${e.location || '-'}</td>
+                            <td>${e.odometer} km</td>
+                            <td>${e.fuelType}</td>
+                            <td>${e.fuelAmount} L</td>
+                            <td>${e.value ? e.value.toFixed(2) + ' ' + currency : '-'}</td>
+                            <td>${e.paymentMethod}</td>
+                        </tr>
+                    `;
+                });
+
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${e.message}</td></tr>`; }
+        }
     </script>
 </body>
 </html>
