@@ -157,6 +157,61 @@ adminRouter.get('/companies', async (req, res) => {
 });
 
 app.use('/api/admin', adminRouter);
+
+// Workday and Refuel events
+const eventsRouter = express.Router();
+eventsRouter.use(authenticateToken);
+
+eventsRouter.get('/workday-events', async (req, res) => {
+    const { startDate, endDate, userId, companyId } = req.query;
+    const where = {};
+    if (startDate) where.startTime = { [Op.gte]: new Date(startDate) };
+    if (endDate) where.endTime = { [Op.lte]: new Date(endDate) };
+    if (userId) where.userId = userId;
+    if (companyId) {
+        const users = await db.User.findAll({ where: { companyId }, attributes: ['id'] });
+        where.userId = { [Op.in]: users.map(u => u.id) };
+    }
+    const events = await db.WorkdayEvent.findAll({ where, include: [db.User] });
+    res.json(events);
+});
+
+eventsRouter.post('/workday-events', async (req, res) => {
+    const newEvent = await db.WorkdayEvent.create(req.body);
+    res.status(201).json(newEvent);
+});
+
+eventsRouter.delete('/workday-events/:id', async (req, res) => {
+    await db.WorkdayEvent.destroy({ where: { id: req.params.id } });
+    res.status(204).send();
+});
+
+eventsRouter.get('/refuel-events', async (req, res) => {
+    const { startDate, endDate, userId, companyId } = req.query;
+    const where = {};
+    if (startDate) where.timestamp = { [Op.gte]: new Date(startDate) };
+    if (endDate) where.timestamp = { [Op.lte]: new Date(endDate) };
+    if (userId) where.userId = userId;
+    if (companyId) {
+        const users = await db.User.findAll({ where: { companyId }, attributes: ['id'] });
+        where.userId = { [Op.in]: users.map(u => u.id) };
+    }
+    const events = await db.RefuelEvent.findAll({ where, include: [db.User] });
+    res.json(events);
+});
+
+eventsRouter.post('/refuel-events', async (req, res) => {
+    const newEvent = await db.RefuelEvent.create(req.body);
+    res.status(201).json(newEvent);
+});
+
+eventsRouter.delete('/refuel-events/:id', async (req, res) => {
+    await db.RefuelEvent.destroy({ where: { id: req.params.id } });
+    res.status(204).send();
+});
+
+app.use('/api', eventsRouter);
+
 console.log('API routes configured.');
 
 app.listen(PORT, async () => {
