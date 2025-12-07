@@ -26,6 +26,14 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id',
       },
     },
+  }, {
+    validate: {
+      atLeastOneId() {
+        if (!this.companyId && !this.userId) {
+          throw new Error('Either companyId or userId must be set.');
+        }
+      }
+    }
   });
 
   return Settings;
