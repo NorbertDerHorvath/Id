@@ -59,6 +59,7 @@
             const form = document.getElementById('edit-workday-form');
             const urlParams = new URLSearchParams(window.location.search);
             const workdayId = urlParams.get('id');
+            const token = localStorage.getItem('token');
 
             if (!workdayId) {
                 alert('Nincs munkanap azonosító megadva!');
@@ -68,7 +69,7 @@
 
             // Fetch existing data
             try {
-                const response = await fetch(`/api/workday-events/${workdayId}`);
+                const response = await fetch(`/api/workday-events/${workdayId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!response.ok) throw new Error('A munkanap betöltése nem sikerült.');
                 const event = await response.json();
 
@@ -101,7 +102,7 @@
                 try {
                     const response = await fetch(`/api/workday-events/${workdayId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify(formData)
                     });
 
@@ -121,9 +122,9 @@
 
             // Helper to format date for datetime-local input
             function toLocalISOString(date) {
-                const tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
-                const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, -1);
-                return localISOTime.substring(0, 16);
+                const d = new Date(date);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                return d.toISOString().slice(0, 16);
             }
         });
     </script>

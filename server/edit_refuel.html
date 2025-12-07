@@ -30,7 +30,7 @@
         <label for="fuelAmount">Mennyiség (liter)</label>
         <input type="number" step="0.01" id="fuelAmount" name="fuelAmount">
 
-        <label for="value">Érték (Ft)</label>
+        <label for="value">Érték (currency)</label>
         <input type="number" step="0.01" id="value" name="value">
 
         <label for="paymentMethod">Fizetési mód</label>
@@ -50,6 +50,7 @@
             const id = urlParams.get('id');
             const form = document.getElementById('edit-refuel-form');
             const messageDiv = document.getElementById('message');
+            const token = localStorage.getItem('token');
 
             if (!id) {
                 messageDiv.innerHTML = '<p style="color: red;">Nincs ID megadva.</p>';
@@ -58,12 +59,12 @@
 
             // Fetch existing data
             try {
-                const response = await fetch(`/api/refuel-events/${id}`);
+                const response = await fetch(`/api/refuel-events/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!response.ok) throw new Error('Nem sikerült betölteni az adatokat.');
                 const event = await response.json();
 
                 // Populate form
-                document.getElementById('timestamp').value = event.timestamp.slice(0, 16);
+                document.getElementById('timestamp').value = toLocalISOString(new Date(event.timestamp));
                 document.getElementById('odometer').value = event.odometer;
                 document.getElementById('fuelType').value = event.fuelType;
                 document.getElementById('fuelAmount').value = event.fuelAmount;
@@ -89,7 +90,7 @@
                 try {
                     const response = await fetch(`/api/refuel-events/${id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify(data)
                     });
                     if (!response.ok) throw new Error('A mentés nem sikerült.');
@@ -99,6 +100,12 @@
                     messageDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
                 }
             });
+            
+            function toLocalISOString(date) {
+                const d = new Date(date);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                return d.toISOString().slice(0, 16);
+            }
         });
     </script>
 </body>
