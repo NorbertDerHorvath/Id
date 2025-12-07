@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Setting } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Settings } = require('./models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
@@ -269,7 +269,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
     try {
-        const settings = await Setting.findOne();
+        const settings = await Settings.findOne();
         res.json(settings ? settings.settings : {});
     } catch (error) {
         res.status(500).json({ error: 'Failed to load settings.' });
@@ -282,12 +282,12 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
     }
     try {
         const newSettings = req.body;
-        let settings = await Setting.findOne();
+        let settings = await Settings.findOne();
         if (settings) {
             settings.settings = { ...settings.settings, ...newSettings };
             await settings.save();
         } else {
-            settings = await Setting.create({ settings: newSettings });
+            settings = await Settings.create({ settings: newSettings });
         }
         res.status(200).json({ message: 'Settings saved', settings: settings.settings });
     } catch (error) {
