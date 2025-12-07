@@ -149,19 +149,20 @@
             if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
                 document.getElementById('user-filter-container').style.display = 'block';
                 document.getElementById('manual-entry-btn').style.display = 'inline-block';
-                if(currentUserRole === 'superadmin') {
-                     document.getElementById('company-filter-container').style.display = 'block';
-                     await populateCompanyFilter();
-                } 
-                await populateUserFilter(decodedToken.companyId);
-            }
-            
-            if (currentUserRole === 'admin' || currentUserRole === 'superadmin'){
                 const navLinks = document.getElementById('nav-links');
                 const adminLi = document.createElement('li');
                 adminLi.className = 'nav-item';
                 adminLi.innerHTML = `<a class="nav-link" href="/admin">Admin</a>`;
                 navLinks.appendChild(adminLi);
+                const settingsLi = document.createElement('li');
+                settingsLi.className = 'nav-item';
+                settingsLi.innerHTML = `<a class="nav-link" href="/settings">Settings</a>`;
+                navLinks.appendChild(settingsLi);
+                if(currentUserRole === 'superadmin') {
+                     document.getElementById('company-filter-container').style.display = 'block';
+                     await populateCompanyFilter();
+                } 
+                await populateUserFilter(decodedToken.companyId);
             }
 
             document.getElementById('filter-btn').addEventListener('click', fetchData);
