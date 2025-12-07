@@ -2,7 +2,7 @@ console.log('--- SERVER STARTING: DEPLOYMENT-CHECK-V2 ---');
 const express = require('express');
 const cors = require('cors');
 const db = require('./models');
-const { Op } = db.Sequelize; // <-- THIS WAS THE CRITICAL BUG! Correctly getting Op.
+const { Op } = db.Sequelize;
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
 const bcrypt = require('bcryptjs');
@@ -10,14 +10,12 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
 console.log('Middleware configured.');
 
-// HTML Serving
 app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
 app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
@@ -27,9 +25,6 @@ app.get('/edit_refuel.html', (req, res) => { res.sendFile(__dirname + '/edit_ref
 
 console.log('HTML routes configured.');
 
-// --- API Routes ---
-
-// Public routes
 app.post('/api/login', async (req, res) => {
   console.log('POST /api/login received');
   const { username, password } = req.body;
@@ -52,26 +47,31 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// --- Admin Settings ---
 app.get('/api/settings', authenticateToken, async (req, res) => {
     console.log(`GET /api/settings request received for user: ${req.user.userId}`);
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-        console.log(`Forbidden GET /api/settings for user: ${req.user.userId}`);
+    const { role, companyId } = req.user;
+    let targetCompanyId = companyId;
+
+    if (role === 'superadmin') {
+        if (req.query.companyId) {
+            targetCompanyId = req.query.companyId;
+        } else {
+            // Superadmin must specify a company
+            return res.status(400).json({ error: 'Company ID is required for superadmin.' });
+        }
+    } else if (role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden' });
     }
-    try {
-        const settings = await db.Settings.findOne();
-        let currentSettings = settings ? settings.settings : {};
 
-        // Ensure maintenance_mode is a boolean before sending to client
+    try {
+        const settings = await db.Settings.findOne({ where: { companyId: targetCompanyId } });
+        let currentSettings = settings ? settings.settings : {};
         if (currentSettings.maintenance_mode !== undefined) {
             currentSettings.maintenance_mode = String(currentSettings.maintenance_mode).toLowerCase() === 'true';
         } else {
-            // Default to false if not set
             currentSettings.maintenance_mode = false; 
         }
-
-        console.log('Settings fetched from DB', currentSettings);
+        console.log('Settings fetched from DB for company:', targetCompanyId, currentSettings);
         res.json(currentSettings);
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -81,27 +81,33 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
 
 app.post('/api/settings', authenticateToken, async (req, res) => {
     console.log(`POST /api/settings request received for user: ${req.user.userId}`);
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-        console.log(`Forbidden POST /api/settings for user: ${req.user.userId}`);
+    const { role, companyId } = req.user;
+    const { newSettings, targetCompanyId: reqCompanyId } = req.body;
+
+    let targetCompanyId = companyId;
+    if (role === 'superadmin') {
+        if (!reqCompanyId) {
+            return res.status(400).json({ error: 'Company ID is required for superadmin.' });
+        }
+        targetCompanyId = reqCompanyId;
+    } else if (role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden' });
     }
+
     try {
-        const newSettings = req.body;
-        // Ensure maintenance_mode is a boolean
         if (newSettings.maintenance_mode !== undefined) {
             newSettings.maintenance_mode = newSettings.maintenance_mode === 'true' || newSettings.maintenance_mode === true;
         }
 
-        let settings = await db.Settings.findOne();
+        let settings = await db.Settings.findOne({ where: { companyId: targetCompanyId } });
         if (settings) {
             settings.settings = { ...settings.settings, ...newSettings };
-             // Mark the settings field as modified, as Sequelize might not detect nested object changes.
             settings.changed('settings', true);
             await settings.save();
         } else {
-            settings = await db.Settings.create({ settings: newSettings });
+            settings = await db.Settings.create({ companyId: targetCompanyId, settings: newSettings });
         }
-        console.log('Settings saved to DB', settings.settings);
+        console.log('Settings saved to DB for company:', targetCompanyId, settings.settings);
         res.status(200).json({ message: 'Settings saved', settings: settings.settings });
     } catch (error) {
         console.error('Error saving settings:', error);
@@ -109,7 +115,6 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
     }
 });
 
-// --- Admin & Superadmin Routes ---
 const adminRouter = express.Router();
 adminRouter.use(authenticateToken, (req, res, next) => {
     console.log(`Admin route requested by user: ${req.user.userId}`);
@@ -137,10 +142,23 @@ adminRouter.get('/users', async (req, res) => {
     }
 });
 
+adminRouter.get('/companies', async (req, res) => {
+    console.log('GET /api/admin/companies request received');
+    if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    try {
+        const companies = await db.Company.findAll({ order: [['name', 'ASC']] });
+        res.json(companies);
+    } catch (error) {
+        console.error('Error fetching companies:', error);
+        res.status(500).json({ error: 'Failed to fetch companies.' });
+    }
+});
+
 app.use('/api/admin', adminRouter);
 console.log('API routes configured.');
 
-// --- Server Initialization ---
 app.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`NODE_ENV is: ${process.env.NODE_ENV}`);
