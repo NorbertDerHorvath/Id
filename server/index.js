@@ -88,14 +88,20 @@ app.get('/api/workday-events', authenticateToken, async (req, res) => {
 
 app.post('/api/workday-events', authenticateToken, async (req, res) => {
     const { userId, role } = req.user;
+    const { userId: targetUserIdBody, ...workdayData } = req.body;
+
     let targetUserId = userId;
-    if ((role === 'admin' || role === 'superadmin') && req.body.userId) {
-        targetUserId = req.body.userId;
+    if ((role === 'admin' || role === 'superadmin') && targetUserIdBody) {
+        targetUserId = targetUserIdBody;
     }
+
     try {
-        const event = await WorkdayEvent.create({ ...req.body, userId: targetUserId });
+        const event = await WorkdayEvent.create({ ...workdayData, userId: targetUserId });
         res.status(201).json(await WorkdayEvent.findByPk(event.id, { include: User }));
-    } catch (error) { res.status(500).json({ error: 'Failed to save workday event.' }); }
+    } catch (error) { 
+        console.error('Error saving workday event:', error);
+        res.status(500).json({ error: 'Failed to save workday event.' }); 
+    }
 });
 
 // Refuel Events API
