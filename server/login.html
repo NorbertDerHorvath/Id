@@ -33,7 +33,8 @@
         const loginForm = document.getElementById('login-form');
         const errorDiv = document.getElementById('error');
 
-        // On page load, always clear old tokens to ensure a clean login state.
+        // **JAVÍTÁS:** Az oldal betöltésekor mindig töröljük a régi tokeneket, 
+        // hogy a felhasználónak be kelljen jelentkeznie. Nincs több automatikus átirányítás.
         document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
@@ -53,6 +54,7 @@
                 });
                 const data = await response.json();
                 if (response.ok) {
+                    // Sikeres bejelentkezés után mentjük az új tokent és átirányítunk
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('username', data.username);
                     window.location.href = '/dashboard';

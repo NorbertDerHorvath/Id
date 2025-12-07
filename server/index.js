@@ -17,7 +17,7 @@ app.use(express.static(__dirname));
 
 // --- HTML Serving ---
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
-app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
+app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); }); 
 app.get('/dashboard', authenticateToken, (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/admin', authenticateToken, (req, res) => { res.sendFile(path.join(__dirname, 'admin.html')); });
 app.get('/settings', authenticateToken, (req, res) => { res.sendFile(path.join(__dirname, 'settings.html')); });
