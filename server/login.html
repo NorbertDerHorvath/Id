@@ -33,13 +33,6 @@
         const loginForm = document.getElementById('login-form');
         const errorDiv = document.getElementById('error');
 
-        // **JAVÍTÁS:** Az oldal betöltésekor mindig töröljük a régi tokeneket, 
-        // hogy a felhasználónak be kelljen jelentkeznie. Nincs több automatikus átirányítás.
-        document.addEventListener('DOMContentLoaded', () => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('username');
-        });
-
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             errorDiv.textContent = '';
@@ -54,7 +47,6 @@
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    // Sikeres bejelentkezés után mentjük az új tokent és átirányítunk
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('username', data.username);
                     window.location.href = '/dashboard';
