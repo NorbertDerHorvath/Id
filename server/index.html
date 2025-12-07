@@ -25,35 +25,35 @@
     </nav>
 
     <div class="container-fluid mt-4">
-        <!-- Filters and tables will be rendered by script -->
+        <!-- Content is rendered by JS -->
     </div>
     
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        // Client-side protection: Check for token on page load
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/login.html';
-        } else {
-            // If token exists, proceed with loading the page content
-            // The server will validate the token on every API call
-            document.addEventListener('DOMContentLoaded', function() {
-                 main();
-            });
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return; // Stop executing script
+            }
+            
+            // If token exists, proceed to load page content.
+            // Server will validate token on each API request.
+            main();
+        });
 
         function main() {
-            const decodedToken = parseJwt(token);
-            if (!decodedToken) { // Should not happen if token is present, but as a fallback
+            const decodedToken = parseJwt(localStorage.getItem('token'));
+            if (!decodedToken) {
                  localStorage.clear();
                  window.location.href = '/login.html';
                  return;
             }
 
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
-
             const currentUserRole = decodedToken.role;
+
             if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
                 const navLinks = document.getElementById('nav-links');
                 navLinks.innerHTML += '<li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>';
@@ -65,7 +65,8 @@
                 window.location.href = '/login.html';
             });
             
-            // Further implementation of dashboard logic will go here
+            // Load main content here
+            // Example: loadDashboardContent();
         }
 
         function parseJwt(token) {

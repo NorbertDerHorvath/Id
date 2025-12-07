@@ -21,22 +21,23 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- Content will be rendered by script -->
+        <!-- Content will be rendered by JS -->
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        // Client-side protection
-        const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/login.html';
-        } else {
-            document.addEventListener('DOMContentLoaded', main);
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return; 
+            }
+            main();
+        });
 
         function main() {
-            const decodedToken = parseJwt(token);
+            const decodedToken = parseJwt(localStorage.getItem('token'));
             if (!decodedToken || (decodedToken.role !== 'admin' && decodedToken.role !== 'superadmin')) {
                 localStorage.clear();
                 window.location.href = '/login.html';
@@ -51,7 +52,8 @@
                 window.location.href = '/login.html';
             });
 
-            // Further implementation of admin page logic will go here
+            // Load admin content here
+            // Example: loadUsersTable();
         }
 
         function parseJwt(token) {
