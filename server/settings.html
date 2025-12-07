@@ -11,7 +11,6 @@
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav mr-auto" id="nav-links">
                 <li class="nav-item"><a class="nav-link" href="/dashboard">Home</a></li>
-                <li class="nav-item active"><a class="nav-link" href="/settings">Settings</a></li>
             </ul>
             <ul class="navbar-nav ml-auto">
                  <li class="nav-item"><span class="navbar-text mr-3">Welcome, <span id="username-display"></span>!</span></li>
@@ -24,9 +23,16 @@
         <h2>Settings</h2>
         <hr>
 
-        <!-- Company Settings (for Admins) -->
-        <div id="company-settings-container" style="display: none;">
+        <!-- Company Settings -->
+        <div id="company-settings-container">
             <h4>Company-wide Settings</h4>
+            
+            <!-- Company Selector for Superadmin -->
+            <div class="form-group" id="company-select-container" style="display: none;">
+                <label for="company-select"><b>Select Company to Edit</b></label>
+                <select id="company-select" class="form-control"></select>
+            </div>
+
             <form id="company-settings-form">
                 <div class="form-group">
                     <label for="currency">Currency</label>
@@ -36,23 +42,13 @@
             </form>
         </div>
 
-        <hr style="display: none;" id="settings-divider">
-
-        <!-- User Settings -->
-        <div id="user-settings-container">
-            <h4>Personal Settings</h4>
-             <form id="user-settings-form">
-                <!-- User-specific settings can go here in the future -->
-                <p>No user-specific settings available yet.</p>
-                 <button type="submit" class="btn btn-primary">Save Personal Settings</button>
-            </form>
-        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         let currentUserRole = null;
+        let companyIdToEdit = null;
 
         function parseJwt(token) {
             try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
@@ -65,32 +61,51 @@
             const decodedToken = parseJwt(token);
             if (!decodedToken) { window.location.href = '/login.html'; return; }
             currentUserRole = decodedToken.role;
+            companyIdToEdit = decodedToken.companyId; // Default for admin
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
 
+            const navLinks = document.getElementById('nav-links');
             if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
-                 document.getElementById('company-settings-container').style.display = 'block';
-                 document.getElementById('settings-divider').style.display = 'block';
-                const navLinks = document.getElementById('nav-links');
-                const adminLi = document.createElement('li');
-                adminLi.className = 'nav-item';
-                adminLi.innerHTML = `<a class="nav-link" href="/admin">Admin</a>`;
-                navLinks.appendChild(adminLi);
+                navLinks.innerHTML += '<li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>';
+                navLinks.innerHTML += '<li class="nav-item active"><a class="nav-link" href="/settings">Settings</a></li>';
+            }
+
+            if (currentUserRole === 'superadmin') {
+                document.getElementById('company-select-container').style.display = 'block';
+                await populateCompanySelect();
+                document.getElementById('company-select').addEventListener('change', (e) => {
+                    companyIdToEdit = e.target.value;
+                    loadSettings();
+                });
+            } else {
+                 loadSettings(); // Admin loads their own company settings
             }
             
-            await loadSettings();
-
             document.getElementById('logout-btn').addEventListener('click', () => {
                 localStorage.clear();
                 window.location.href = '/login.html';
             });
 
-            document.getElementById('company-settings-form').addEventListener('submit', (e) => saveSettings(e, 'company'));
-            document.getElementById('user-settings-form').addEventListener('submit', (e) => saveSettings(e, 'user'));
+            document.getElementById('company-settings-form').addEventListener('submit', saveCompanySettings);
         });
 
-        async function loadSettings() {
+        async function populateCompanySelect() {
             try {
-                const res = await fetch('/api/settings', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                const res = await fetch('/api/companies', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
+                const companies = await res.json();
+                const select = document.getElementById('company-select');
+                select.innerHTML = '<option value="">Select a company...</option>';
+                companies.forEach(c => {
+                    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+                });
+            } catch (e) { console.error('Failed to populate companies', e); }
+        }
+
+        async function loadSettings() {
+            if (!companyIdToEdit) return; // Don't load if no company is selected (for superadmin)
+            document.getElementById('currency').value = ''; // Clear old value
+            try {
+                const res = await fetch(`/api/settings?companyId=${companyIdToEdit}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
                 const data = await res.json();
                 if (data.companySettings.currency) {
                     document.getElementById('currency').value = data.companySettings.currency;
@@ -98,14 +113,14 @@
             } catch (e) { console.error('Failed to load settings', e); }
         }
 
-        async function saveSettings(event, level) {
+        async function saveCompanySettings(event) {
             event.preventDefault();
-            let settings = {};
-            if (level === 'company') {
-                settings.currency = document.getElementById('currency').value;
-            } else {
-                // Populate with user settings when they exist
+            if (!companyIdToEdit) {
+                alert('Please select a company first.');
+                return;
             }
+
+            const settings = { currency: document.getElementById('currency').value };
 
             try {
                 const res = await fetch('/api/settings', {
@@ -114,10 +129,10 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     },
-                    body: JSON.stringify({ settings, level })
+                    body: JSON.stringify({ settings, level: 'company', targetCompanyId: companyIdToEdit })
                 });
                 if (!res.ok) throw new Error((await res.json()).error);
-                alert('Settings saved!');
+                alert('Company settings saved!');
             } catch (e) {
                 alert('Error saving settings: ' + e.message);
             }
