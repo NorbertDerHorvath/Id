@@ -212,7 +212,7 @@ app.get('/api/refuel-events', authenticateToken, async (req, res) => {
                  whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
             }
         } else if (role === 'superadmin') {
-            if(queryCompanyId && queryCompanyId !== 'all') {
+             if(queryCompanyId && queryCompanyId !== 'all') {
                 const usersInCompany = await db.User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
                 whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
              } else if (queryUserId && queryUserId !== 'all') {
@@ -394,11 +394,20 @@ const createSuperAdmin = async () => {
 
 app.listen(PORT, async () => {
   console.log(`Server listening on port ${PORT}`);
+  console.log(`NODE_ENV is: ${process.env.NODE_ENV}`);
+  if (process.env.DB_CONNECTION_STRING) {
+      console.log('DB_CONNECTION_STRING is set.');
+  } else {
+      console.log('DB_CONNECTION_STRING is NOT set, using default localhost.');
+  }
   try {
     await db.sequelize.authenticate();
-    console.log('Database connection established.');
+    console.log('Database connection established successfully.');
     await db.sequelize.sync({ alter: true });
+    console.log('All models were synchronized successfully.');
     await createSuperAdmin();
-    console.log('All models synchronized.');
-  } catch (error) { console.error('Unable to connect to the database:', error); }
+    console.log('Superadmin check/creation complete.');
+  } catch (error) {
+    console.error('Unable to connect to the database or sync models:', error);
+  }
 });
