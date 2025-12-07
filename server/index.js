@@ -241,7 +241,7 @@ app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { userId, role } = req.user;
     try {
-        const event = await RefuelEvent.findByPk(.id);
+        const event = await RefuelEvent.findByPk(id);
         if (!event) return res.status(404).json({ error: 'Refuel event not found' });
         if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
