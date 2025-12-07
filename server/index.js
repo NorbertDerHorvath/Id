@@ -269,8 +269,8 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
     try {
-        const settings = await Setting.findAll();
-        res.json(settings);
+        const settings = await Setting.findOne();
+        res.json(settings ? settings.settings : {});
     } catch (error) {
         res.status(500).json({ error: 'Failed to load settings.' });
     }
@@ -281,11 +281,15 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
     try {
-        const settings = req.body;
-        for (const setting of settings) {
-            await Setting.upsert({ key: setting.key, value: setting.value });
+        const newSettings = req.body;
+        let settings = await Setting.findOne();
+        if (settings) {
+            settings.settings = { ...settings.settings, ...newSettings };
+            await settings.save();
+        } else {
+            settings = await Setting.create({ settings: newSettings });
         }
-        res.status(200).json({ message: 'Settings saved' });
+        res.status(200).json({ message: 'Settings saved', settings: settings.settings });
     } catch (error) {
         res.status(500).json({ error: 'Failed to save settings.' });
     }
