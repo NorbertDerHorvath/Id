@@ -61,8 +61,18 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
     }
     try {
         const settings = await db.Settings.findOne();
-        console.log('Settings fetched from DB');
-        res.json(settings ? settings.settings : {});
+        let currentSettings = settings ? settings.settings : {};
+
+        // Ensure maintenance_mode is a boolean before sending to client
+        if (currentSettings.maintenance_mode !== undefined) {
+            currentSettings.maintenance_mode = String(currentSettings.maintenance_mode).toLowerCase() === 'true';
+        } else {
+            // Default to false if not set
+            currentSettings.maintenance_mode = false; 
+        }
+
+        console.log('Settings fetched from DB', currentSettings);
+        res.json(currentSettings);
     } catch (error) {
         console.error('Error loading settings:', error);
         res.status(500).json({ error: 'Failed to load settings.' });
@@ -77,14 +87,21 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
     }
     try {
         const newSettings = req.body;
+        // Ensure maintenance_mode is a boolean
+        if (newSettings.maintenance_mode !== undefined) {
+            newSettings.maintenance_mode = newSettings.maintenance_mode === 'true' || newSettings.maintenance_mode === true;
+        }
+
         let settings = await db.Settings.findOne();
         if (settings) {
             settings.settings = { ...settings.settings, ...newSettings };
+             // Mark the settings field as modified, as Sequelize might not detect nested object changes.
+            settings.changed('settings', true);
             await settings.save();
         } else {
             settings = await db.Settings.create({ settings: newSettings });
         }
-        console.log('Settings saved to DB');
+        console.log('Settings saved to DB', settings.settings);
         res.status(200).json({ message: 'Settings saved', settings: settings.settings });
     } catch (error) {
         console.error('Error saving settings:', error);

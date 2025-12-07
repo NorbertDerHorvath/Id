@@ -51,7 +51,7 @@
              document.querySelector('a[href="/settings"]').parentElement.style.display = 'none';
         }
 
-        if (window.location.pathname.endsWith('settings.html')) {
+        if (window.location.pathname.endsWith('settings')) { // Adjusted to match the path
             if (!isAdmin) {
                  window.location.href = '/dashboard';
                  return;
@@ -88,7 +88,8 @@
 
     function renderSettingsForm(settings) {
         const settingsContent = document.getElementById('settings-content');
-        const maintenanceMode = settings.maintenance_mode === 'true';
+        // Directly use the boolean value from the server.
+        const maintenanceMode = settings.maintenance_mode === true;
 
         settingsContent.innerHTML = `
             <form id="settings-form">
