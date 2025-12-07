@@ -63,6 +63,21 @@ app.post('/api/companies', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/companies/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+    const { name, adminEmail } = req.body;
+    try {
+        const company = await Company.findByPk(req.params.id);
+        if (!company) return res.status(404).json({ error: 'Company not found' });
+        company.name = name || company.name;
+        company.adminEmail = adminEmail || company.adminEmail;
+        await company.save();
+        res.json(company);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update company.' });
+    }
+});
+
 app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
     if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
     try {
@@ -76,6 +91,17 @@ app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
 });
 
 // Workday Events API
+app.get('/api/workday-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await WorkdayEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Workday event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+        res.json(event);
+    } catch (error) { res.status(500).json({ error: 'Failed to fetch workday event.' }); }
+});
+
 app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
@@ -154,6 +180,17 @@ app.delete('/api/workday-events/:id', authenticateToken, async (req, res) => {
 });
 
 // Refuel Events API
+app.get('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await RefuelEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Refuel event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+        res.json(event);
+    } catch (error) { res.status(500).json({ error: 'Failed to fetch refuel event.' }); }
+});
+
 app.get('/api/refuel-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
