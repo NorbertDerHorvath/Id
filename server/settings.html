@@ -67,7 +67,7 @@
                 return;
             }
             currentUserRole = decodedToken.role;
-            companyIdToEdit = decodedToken.companyId;
+            companyIdToEdit = decodedToken.companyId; 
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
 
             const navLinks = document.getElementById('nav-links');
@@ -117,8 +117,11 @@
         }
 
         async function loadSettings() {
-            if (!companyIdToEdit) return;
-            document.getElementById('company-settings-form').reset();
+            if (!companyIdToEdit) {
+                document.getElementById('company-settings-form').reset();
+                return;
+            }
+            document.getElementById('currency').value = ''; 
             try {
                 const res = await fetch(`/api/settings?companyId=${companyIdToEdit}`, { headers: { 'Authorization': `Bearer ${token}` }});
                 const data = await res.json();
