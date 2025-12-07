@@ -1,7 +1,14 @@
 const { Sequelize, DataTypes } = require('sequelize');
-const sequelize = new Sequelize(process.env.DB_CONNECTION_STRING || 'postgres://user:password@localhost:5432/database', {
+
+const connectionString = process.env.DB_CONNECTION_STRING || 'postgres://user:password@localhost:5432/database';
+const isProduction = process.env.NODE_ENV === 'production';
+
+const sequelize = new Sequelize(connectionString, {
   dialect: 'postgres',
   logging: false,
+  dialectOptions: {
+    ssl: isProduction ? { require: true, rejectUnauthorized: false } : false,
+  },
 });
 
 const db = {};
