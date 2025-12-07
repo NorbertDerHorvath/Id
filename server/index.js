@@ -17,7 +17,7 @@ app.use(express.static(__dirname));
 
 // --- HTML Serving (NO authentication middleware here!) ---
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
-app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
+app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); }); 
 app.get('/dashboard', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'admin.html')); });
 app.get('/settings', (req, res) => { res.sendFile(path.join(__dirname, 'settings.html')); });
@@ -129,6 +129,16 @@ app.post('/api/workday-events', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to save workday event.' }); }
 });
 
+app.put('/api/workday-events/:id', async (req, res) => {
+    try {
+        const event = await WorkdayEvent.findByPk(req.params.id);
+        if(!event) return res.status(404).json({error: "Event not found"});
+        await event.update(req.body);
+        res.json(event);
+    } catch (e) { res.status(500).json({error: e.message}) }
+});
+
+
 app.get('/api/refuel-events', async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
@@ -169,6 +179,14 @@ app.post('/api/refuel-events', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to save refuel event.' }); }
 });
 
+app.put('/api/refuel-events/:id', async (req, res) => {
+    try {
+        const event = await RefuelEvent.findByPk(req.params.id);
+        if(!event) return res.status(404).json({error: "Event not found"});
+        await event.update(req.body);
+        res.json(event);
+    } catch (e) { res.status(500).json({error: e.message}) }
+});
 
 const adminRouter = express.Router();
 
