@@ -4,39 +4,35 @@ const sequelize = new Sequelize(process.env.DB_CONNECTION_STRING || 'postgres://
   logging: false,
 });
 
-const Company = require('./Company')(sequelize, DataTypes);
-const User = require('./User')(sequelize, DataTypes);
-const WorkdayEvent = require('./WorkdayEvent')(sequelize, DataTypes);
-const RefuelEvent = require('./RefuelEvent')(sequelize, DataTypes);
-const LoadingEvent = require('./LoadingEvent')(sequelize, DataTypes);
-const Settings = require('./Settings')(sequelize, DataTypes);
+const db = {};
+
+db.Sequelize = Sequelize;
+db.sequelize = sequelize;
+
+db.Company = require('./Company')(sequelize, DataTypes);
+db.User = require('./User')(sequelize, DataTypes);
+db.WorkdayEvent = require('./WorkdayEvent')(sequelize, DataTypes);
+db.RefuelEvent = require('./RefuelEvent')(sequelize, DataTypes);
+db.LoadingEvent = require('./LoadingEvent')(sequelize, DataTypes);
+db.Settings = require('./Settings')(sequelize, DataTypes);
 
 // Associations
-Company.hasMany(User, { foreignKey: 'companyId' });
-User.belongsTo(Company, { foreignKey: 'companyId' });
+db.Company.hasMany(db.User, { foreignKey: 'companyId' });
+db.User.belongsTo(db.Company, { foreignKey: 'companyId' });
 
-User.hasMany(WorkdayEvent, { foreignKey: 'userId' });
-WorkdayEvent.belongsTo(User, { foreignKey: 'userId' });
+db.User.hasMany(db.WorkdayEvent, { foreignKey: 'userId' });
+db.WorkdayEvent.belongsTo(db.User, { foreignKey: 'userId' });
 
-User.hasMany(RefuelEvent, { foreignKey: 'userId' });
-RefuelEvent.belongsTo(User, { foreignKey: 'userId' });
+db.User.hasMany(db.RefuelEvent, { foreignKey: 'userId' });
+db.RefuelEvent.belongsTo(db.User, { foreignKey: 'userId' });
 
-User.hasMany(LoadingEvent, { foreignKey: 'userId' });
-LoadingEvent.belongsTo(User, { foreignKey: 'userId' });
+db.User.hasMany(db.LoadingEvent, { foreignKey: 'userId' });
+db.LoadingEvent.belongsTo(db.User, { foreignKey: 'userId' });
 
-Company.hasOne(Settings, { foreignKey: 'companyId' });
-Settings.belongsTo(Company, { foreignKey: 'companyId' });
+db.Company.hasOne(db.Settings, { foreignKey: 'companyId' });
+db.Settings.belongsTo(db.Company, { foreignKey: 'companyId' });
 
-User.hasOne(Settings, { foreignKey: 'userId' });
-Settings.belongsTo(User, { foreignKey: 'userId' });
+db.User.hasOne(db.Settings, { foreignKey: 'userId' });
+db.Settings.belongsTo(db.User, { foreignKey: 'userId' });
 
-
-module.exports = {
-  sequelize,
-  Company,
-  User,
-  WorkdayEvent,
-  RefuelEvent,
-  LoadingEvent,
-  Settings,
-};
+module.exports = db;
