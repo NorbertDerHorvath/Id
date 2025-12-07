@@ -67,7 +67,7 @@
              <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th><th>Actions</th>
+                        <th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Plate</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th><th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="refuel-table-body"></tbody>
@@ -299,6 +299,7 @@
                             <td>${new Date(e.timestamp).toLocaleString()}</td>
                             <td>${e.location || '-'}</td>
                             <td>${e.odometer} km</td>
+                            <td>${e.carPlate || '-'}</td>
                             <td>${e.fuelType}</td>
                             <td>${e.fuelAmount} L</td>
                             <td>${e.value ? e.value.toFixed(2) + ' currency' : '-'}</td>
