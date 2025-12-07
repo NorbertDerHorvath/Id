@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Setting } = require('./models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
@@ -241,7 +241,7 @@ app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { userId, role } = req.user;
     try {
-        const event = await RefuelEvent.findByPk(id);
+        const event = await RefuelEvent.findByPk(.id);
         if (!event) return res.status(404).json({ error: 'Refuel event not found' });
         if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
 
@@ -263,6 +263,33 @@ app.delete('/api/refuel-events/:id', authenticateToken, async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to delete refuel event.' }); }
 });
 
+// --- Admin Settings ---
+app.get('/api/settings', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    try {
+        const settings = await Setting.findAll();
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load settings.' });
+    }
+});
+
+app.post('/api/settings', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    try {
+        const settings = req.body;
+        for (const setting of settings) {
+            await Setting.upsert({ key: setting.key, value: setting.value });
+        }
+        res.status(200).json({ message: 'Settings saved' });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to save settings.' });
+    }
+});
 
 // --- Admin & Superadmin Routes ---
 const adminRouter = express.Router();
