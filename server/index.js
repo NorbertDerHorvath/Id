@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Settings } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent } = require('./models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
@@ -15,16 +14,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// --- HTML Serving (NO authentication middleware here!) ---
-app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
-app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); }); 
-app.get('/dashboard', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
-app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'admin.html')); });
-app.get('/settings', (req, res) => { res.sendFile(path.join(__dirname, 'settings.html')); });
+// HTML Serving
+app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
+app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
+app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
+app.get('/edit_workday.html', (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
+app.get('/edit_refuel.html', (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
 
 // --- API Routes ---
 
-// Public login route
+// Public routes
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -32,64 +31,29 @@ app.post('/api/login', async (req, res) => {
     if (!user || !(await user.isValidPassword(password))) return res.status(401).json({ error: 'Invalid username or password.' });
     
     const token = jwt.sign({ userId: user.id, role: user.role, companyId: user.companyId }, process.env.JWT_SECRET || 'a_very_secret_key_that_should_be_in_env', { expiresIn: '30d' });
+    user.lastLoginTime = new Date();
+    user.lastLoginLocation = req.ip;
+    await user.save();
     res.json({ message: 'Login successful', token, username: user.username, role: user.role });
   } catch (error) {
-    console.error('Login Error:', error);
     res.status(500).json({ error: 'Server error during login.' });
   }
 });
+app.get('/api/validate-token', authenticateToken, (req, res) => res.json({ valid: true }));
 
-// Secure all other API routes
-app.use('/api', authenticateToken);
-
-// Protected API routes from here
-app.get('/api/validate-token', (req, res) => res.json({ valid: true }));
-
-app.get('/api/settings', async (req, res) => {
-    const { userId, companyId } = req.user;
-    const targetCompanyId = req.query.companyId || companyId;
-    try {
-        const userSettings = await Settings.findOne({ where: { userId } });
-        const companySettings = await Settings.findOne({ where: { companyId: targetCompanyId } });
-        res.json({ 
-            userSettings: userSettings?.settings || {},
-            companySettings: companySettings?.settings || { currency: 'HUF', visibleFields: {}, customFields: [] } 
-        });
-    } catch (e) { res.status(500).json({ error: 'Failed to get settings.' }); }
-});
-
-app.post('/api/settings', async (req, res) => {
-    const { userId, companyId, role } = req.user;
-    const { settings, level, targetCompanyId } = req.body;
-    if (!level) return res.status(400).json({ error: 'Level is required.' });
-
-    let whereClause = {};
-    if (level === 'user') { whereClause = { userId }; }
-    else if (level === 'company') {
-        if (role === 'superadmin' && targetCompanyId) whereClause = { companyId: targetCompanyId };
-        else if (role === 'admin') whereClause = { companyId };
-        else return res.status(403).json({ error: 'Forbidden' });
-    } else { return res.status(400).json({ error: 'Invalid level.' }); }
-
-    try {
-        const [setting, created] = await Settings.findOrCreate({ where: whereClause, defaults: { settings, ...whereClause } });
-        if (!created) {
-            const newSettings = { ...setting.settings, ...settings };
-            await setting.update({ settings: newSettings });
-        }
-        res.status(200).json(setting);
-    } catch (e) { res.status(500).json({ error: 'Failed to save settings.' }); }
-});
-
-app.get('/api/companies', async (req, res) => {
+// Company routes (for superadmin)
+app.get('/api/companies', authenticateToken, async (req, res) => {
     if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
     try {
         const companies = await Company.findAll({ order: [['name', 'ASC']] });
         res.json(companies);
-    } catch (e) { res.status(500).json({ error: 'Failed to fetch companies.' }); }
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch companies.' });
+    }
 });
 
-app.get('/api/workday-events', async (req, res) => {
+// Workday Events API
+app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
     const whereClause = {};
@@ -97,8 +61,9 @@ app.get('/api/workday-events', async (req, res) => {
         if (startDate && endDate) whereClause.startTime = { [Op.between]: [new Date(startDate), new Date(endDate)] };
         if (carPlate) whereClause.carPlate = { [Op.iLike]: `%${carPlate}%` };
 
-        if (role === 'user') whereClause.userId = userId;
-        else if (role === 'admin') {
+        if (role === 'user') {
+            whereClause.userId = userId;
+        } else if (role === 'admin') {
             const usersInCompany = await User.findAll({ where: { companyId, role: {[Op.ne]: 'superadmin'} }, attributes: ['id'] });
             if (queryUserId && queryUserId !== 'all') {
                  const userInCompany = usersInCompany.find(u => u.id === queryUserId);
@@ -111,7 +76,9 @@ app.get('/api/workday-events', async (req, res) => {
              if(queryCompanyId && queryCompanyId !== 'all') {
                 const usersInCompany = await User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
                 whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
-             } else if (queryUserId && queryUserId !== 'all') whereClause.userId = queryUserId;
+             } else if (queryUserId && queryUserId !== 'all') {
+                whereClause.userId = queryUserId
+             }
         }
 
         const events = await WorkdayEvent.findAll({ where: whereClause, include: User, order: [['startTime', 'DESC']] });
@@ -119,27 +86,20 @@ app.get('/api/workday-events', async (req, res) => {
     } catch (e) { res.status(500).json({error: e.message}) }
 });
 
-app.post('/api/workday-events', async (req, res) => {
+app.post('/api/workday-events', authenticateToken, async (req, res) => {
     const { userId, role } = req.user;
     let targetUserId = userId;
-    if ((role === 'admin' || role === 'superadmin') && req.body.userId) targetUserId = req.body.userId;
+    if ((role === 'admin' || role === 'superadmin') && req.body.userId) {
+        targetUserId = req.body.userId;
+    }
     try {
         const event = await WorkdayEvent.create({ ...req.body, userId: targetUserId });
         res.status(201).json(await WorkdayEvent.findByPk(event.id, { include: User }));
     } catch (error) { res.status(500).json({ error: 'Failed to save workday event.' }); }
 });
 
-app.put('/api/workday-events/:id', async (req, res) => {
-    try {
-        const event = await WorkdayEvent.findByPk(req.params.id);
-        if(!event) return res.status(404).json({error: "Event not found"});
-        await event.update(req.body);
-        res.json(event);
-    } catch (e) { res.status(500).json({error: e.message}) }
-});
-
-
-app.get('/api/refuel-events', async (req, res) => {
+// Refuel Events API
+app.get('/api/refuel-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
     const whereClause = {};
@@ -147,8 +107,9 @@ app.get('/api/refuel-events', async (req, res) => {
         if (startDate && endDate) whereClause.timestamp = { [Op.between]: [new Date(startDate), new Date(endDate)] };
         if (carPlate) whereClause.carPlate = { [Op.iLike]: `%${carPlate}%` };
         
-        if (role === 'user') whereClause.userId = userId;
-        else if (role === 'admin') {
+        if (role === 'user') {
+            whereClause.userId = userId;
+        } else if (role === 'admin') {
             const usersInCompany = await User.findAll({ where: { companyId, role: {[Op.ne]: 'superadmin'} }, attributes: ['id'] });
             if (queryUserId && queryUserId !== 'all') {
                  const userInCompany = usersInCompany.find(u => u.id === queryUserId);
@@ -161,7 +122,9 @@ app.get('/api/refuel-events', async (req, res) => {
             if(queryCompanyId && queryCompanyId !== 'all') {
                 const usersInCompany = await User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
                 whereClause.userId = { [Op.in]: usersInCompany.map(u => u.id) };
-             } else if (queryUserId && queryUserId !== 'all') whereClause.userId = queryUserId;
+             } else if (queryUserId && queryUserId !== 'all') {
+                whereClause.userId = queryUserId
+             }
         }
 
         const events = await RefuelEvent.findAll({ where: whereClause, include: User, order: [['timestamp', 'DESC']] });
@@ -169,26 +132,25 @@ app.get('/api/refuel-events', async (req, res) => {
     } catch (e) { res.status(500).json({error: e.message}) }
 });
 
-app.post('/api/refuel-events', async (req, res) => {
+app.post('/api/refuel-events', authenticateToken, async (req, res) => {
     const { userId, role } = req.user;
     let targetUserId = userId;
-    if ((role === 'admin' || role === 'superadmin') && req.body.userId) targetUserId = req.body.userId;
+    if ((role === 'admin' || role === 'superadmin') && req.body.userId) {
+        targetUserId = req.body.userId;
+    }
     try {
         const event = await RefuelEvent.create({ ...req.body, userId: targetUserId });
         res.status(201).json(await RefuelEvent.findByPk(event.id, { include: User }));
     } catch (error) { res.status(500).json({ error: 'Failed to save refuel event.' }); }
 });
 
-app.put('/api/refuel-events/:id', async (req, res) => {
-    try {
-        const event = await RefuelEvent.findByPk(req.params.id);
-        if(!event) return res.status(404).json({error: "Event not found"});
-        await event.update(req.body);
-        res.json(event);
-    } catch (e) { res.status(500).json({error: e.message}) }
-});
 
+// --- Admin & Superadmin Routes ---
 const adminRouter = express.Router();
+adminRouter.use(authenticateToken, (req, res, next) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+    next();
+});
 
 adminRouter.get('/users', async (req, res) => {
     const { companyId, role } = req.user;
@@ -201,7 +163,7 @@ adminRouter.get('/users', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to fetch users.' }); }
 });
 
-app.use('/api/admin', authenticateToken, adminRouter);
+app.use('/api/admin', adminRouter);
 
 // --- Server Initialization ---
 const createSuperAdmin = async () => {
@@ -209,9 +171,11 @@ const createSuperAdmin = async () => {
         const superadmin = await User.findOne({ where: { username: 'norbapp' } });
         if (!superadmin) {
             await User.create({ username: 'norbapp', password: 'norbapp', role: 'superadmin', realName: 'Super Admin', companyId: null });
-        } else if (superadmin.companyId !== null) {
-            superadmin.companyId = null;
-            await superadmin.save();
+        } else {
+             if (superadmin.companyId !== null) {
+                superadmin.companyId = null;
+                await superadmin.save();
+             }
         }
     } catch (error) { console.error('Error ensuring superadmin exists:', error); }
 };
