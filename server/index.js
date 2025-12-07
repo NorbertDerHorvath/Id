@@ -169,6 +169,70 @@ adminRouter.get('/users', async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to fetch users.' }); }
 });
 
+adminRouter.post('/users', async (req, res) => {
+    const { username, realName, password, role, companyId: reqCompanyId } = req.body;
+    const { companyId: adminCompanyId, role: adminRole } = req.user;
+    try {
+        let targetCompanyId = adminCompanyId;
+        if (adminRole === 'superadmin' && reqCompanyId) {
+            targetCompanyId = reqCompanyId;
+        }
+        const newUser = await User.create({ username, realName, password, role, companyId: targetCompanyId });
+        res.status(201).json(newUser);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create user.' });
+    }
+});
+
+adminRouter.put('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const { realName, password, role, companyId: reqCompanyId } = req.body;
+    const { companyId: adminCompanyId, role: adminRole } = req.user;
+
+    try {
+        const user = await User.findByPk(id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (adminRole === 'admin' && user.companyId !== adminCompanyId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        user.realName = realName || user.realName;
+        user.role = role || user.role;
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            user.password = await bcrypt.hash(password, salt);
+        }
+        if (adminRole === 'superadmin' && reqCompanyId) {
+            user.companyId = reqCompanyId;
+        }
+
+        await user.save();
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update user.' });
+    }
+});
+
+adminRouter.delete('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const { companyId: adminCompanyId, role: adminRole } = req.user;
+
+    try {
+        const user = await User.findByPk(id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        if (adminRole === 'admin' && user.companyId !== adminCompanyId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+
+        await user.destroy();
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete user.' });
+    }
+});
+
 app.use('/api/admin', adminRouter);
 
 // --- Server Initialization ---
