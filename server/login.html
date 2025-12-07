@@ -33,10 +33,11 @@
         const loginForm = document.getElementById('login-form');
         const errorDiv = document.getElementById('error');
 
-        // On page load, clear any old tokens to prevent issues.
-        // The user must always log in from this page.
-        localStorage.removeItem('token');
-        localStorage.removeItem('username');
+        // On page load, always clear old tokens to ensure a clean login.
+        document.addEventListener('DOMContentLoaded', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+        });
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
