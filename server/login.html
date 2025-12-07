@@ -33,7 +33,7 @@
         const loginForm = document.getElementById('login-form');
         const errorDiv = document.getElementById('error');
 
-        // On page load, always clear old tokens to ensure a clean login.
+        // On page load, always clear old tokens to ensure a clean login state.
         document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('token');
             localStorage.removeItem('username');
