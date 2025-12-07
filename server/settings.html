@@ -20,45 +20,137 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- Content will be rendered by JS -->
+        <div id="main-content">
+            <h2>Settings</h2>
+            <hr>
+            <div id="company-settings-container" style="display: none;">
+                <h4>Company-wide Settings</h4>
+                <div class="form-group" id="company-select-container" style="display: none;">
+                    <label for="company-select"><b>Select Company to Edit</b></label>
+                    <select id="company-select" class="form-control"></select>
+                </div>
+                <form id="company-settings-form" style="display: none;">
+                    <div class="form-group">
+                        <label for="currency">Currency</label>
+                        <input type="text" class="form-control" id="currency" placeholder="e.g., HUF, EUR, USD">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Company Settings</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
+        const token = localStorage.getItem('token');
+        let currentUserRole = null;
+        let companyIdToEdit = null;
+
         document.addEventListener('DOMContentLoaded', function() {
-            const token = localStorage.getItem('token');
             if (!token) {
                 window.location.href = '/login.html';
-                return; 
+                return;
             }
             main();
         });
 
-        function main() {
-            const decodedToken = parseJwt(localStorage.getItem('token'));
-            if (!decodedToken || (decodedToken.role !== 'admin' && decodedToken.role !== 'superadmin')) {
+        function parseJwt(token) {
+            try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
+        }
+
+        async function main() {
+            const decodedToken = parseJwt(token);
+            if (!decodedToken) {
                 localStorage.clear();
                 window.location.href = '/login.html';
                 return;
             }
-            
+            currentUserRole = decodedToken.role;
+            companyIdToEdit = decodedToken.companyId;
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
-            document.getElementById('nav-links').innerHTML += '<li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>';
-            document.getElementById('nav-links').innerHTML += '<li class="nav-item active"><a class="nav-link" href="/settings">Settings</a></li>';
 
+            const navLinks = document.getElementById('nav-links');
+            if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
+                navLinks.innerHTML += '<li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>';
+                navLinks.innerHTML += '<li class="nav-item active"><a class="nav-link" href="/settings">Settings</a></li>';
+                document.getElementById('company-settings-container').style.display = 'block';
+            }
 
+            if (currentUserRole === 'superadmin') {
+                document.getElementById('company-select-container').style.display = 'block';
+                await populateCompanySelect();
+                document.getElementById('company-select').addEventListener('change', (e) => {
+                    companyIdToEdit = e.target.value;
+                    if(companyIdToEdit) {
+                         document.getElementById('company-settings-form').style.display = 'block';
+                         loadSettings();
+                    } else {
+                         document.getElementById('company-settings-form').style.display = 'none';
+                    }
+                });
+            } else if (currentUserRole === 'admin') {
+                document.getElementById('company-settings-form').style.display = 'block';
+                loadSettings();
+            } else {
+                document.getElementById('main-content').innerHTML = '<p class="alert alert-danger">You do not have permission to view this page.</p>';
+            }
+            
             document.getElementById('logout-btn').addEventListener('click', () => {
                 localStorage.clear();
                 window.location.href = '/login.html';
             });
 
-            // Load settings content here
-            // Example: loadSettingsForm();
+            document.getElementById('company-settings-form').addEventListener('submit', saveCompanySettings);
         }
 
-        function parseJwt(token) {
-            try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
+        async function populateCompanySelect() {
+            try {
+                const res = await fetch('/api/companies', { headers: { 'Authorization': `Bearer ${token}` }});
+                const companies = await res.json();
+                const select = document.getElementById('company-select');
+                select.innerHTML = '<option value="">Select a company...</option>';
+                companies.forEach(c => {
+                    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+                });
+            } catch (e) { console.error('Failed to populate companies', e); }
+        }
+
+        async function loadSettings() {
+            if (!companyIdToEdit) return;
+            document.getElementById('company-settings-form').reset();
+            try {
+                const res = await fetch(`/api/settings?companyId=${companyIdToEdit}`, { headers: { 'Authorization': `Bearer ${token}` }});
+                const data = await res.json();
+                if (data.companySettings.currency) {
+                    document.getElementById('currency').value = data.companySettings.currency;
+                }
+            } catch (e) { console.error('Failed to load settings', e); }
+        }
+
+        async function saveCompanySettings(event) {
+            event.preventDefault();
+            if (!companyIdToEdit) {
+                alert('Please select a company first.');
+                return;
+            }
+
+            const settings = { currency: document.getElementById('currency').value };
+
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ settings, level: 'company', targetCompanyId: companyIdToEdit })
+                });
+                if (!res.ok) throw new Error((await res.json()).error);
+                alert('Company settings saved!');
+            } catch (e) {
+                alert('Error saving settings: ' + e.message);
+            }
         }
     </script>
 </body>
