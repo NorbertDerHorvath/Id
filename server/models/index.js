@@ -1,22 +1,17 @@
-const sequelize = require('../config/database');
-const Company = require('./Company');
-const User = require('./User');
-const WorkdayEvent = require('./WorkdayEvent');
-const RefuelEvent = require('./RefuelEvent');
-const LoadingEvent = require('./LoadingEvent');
+const { Sequelize, DataTypes } = require('sequelize');
+const sequelize = new Sequelize(process.env.DB_CONNECTION_STRING || 'postgres://user:password@localhost:5432/database', {
+  dialect: 'postgres',
+  logging: false,
+});
 
-// Modellek
-const db = {
-  sequelize,
-  Sequelize: sequelize.Sequelize,
-  Company,
-  User,
-  WorkdayEvent,
-  RefuelEvent,
-  LoadingEvent,
-};
+const Company = require('./Company')(sequelize, DataTypes);
+const User = require('./User')(sequelize, DataTypes);
+const WorkdayEvent = require('./WorkdayEvent')(sequelize, DataTypes);
+const RefuelEvent = require('./RefuelEvent')(sequelize, DataTypes);
+const LoadingEvent = require('./LoadingEvent')(sequelize, DataTypes);
+const Settings = require('./Settings')(sequelize, DataTypes);
 
-// Relációk
+// Associations
 Company.hasMany(User, { foreignKey: 'companyId' });
 User.belongsTo(Company, { foreignKey: 'companyId' });
 
@@ -29,4 +24,19 @@ RefuelEvent.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(LoadingEvent, { foreignKey: 'userId' });
 LoadingEvent.belongsTo(User, { foreignKey: 'userId' });
 
-module.exports = db;
+Company.hasOne(Settings, { foreignKey: 'companyId' });
+Settings.belongsTo(Company, { foreignKey: 'companyId' });
+
+User.hasOne(Settings, { foreignKey: 'userId' });
+Settings.belongsTo(User, { foreignKey: 'userId' });
+
+
+module.exports = {
+  sequelize,
+  Company,
+  User,
+  WorkdayEvent,
+  RefuelEvent,
+  LoadingEvent,
+  Settings,
+};
