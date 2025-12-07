@@ -17,7 +17,7 @@ app.use(express.static(__dirname));
 
 // --- HTML Serving (NO authentication middleware here!) ---
 app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
-app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); }); 
+app.get('/login.html', (req, res) => { res.sendFile(path.join(__dirname, 'login.html')); });
 app.get('/dashboard', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.get('/admin', (req, res) => { res.sendFile(path.join(__dirname, 'admin.html')); });
 app.get('/settings', (req, res) => { res.sendFile(path.join(__dirname, 'settings.html')); });
@@ -171,6 +171,7 @@ app.post('/api/refuel-events', async (req, res) => {
 
 
 const adminRouter = express.Router();
+
 adminRouter.get('/users', async (req, res) => {
     const { companyId, role } = req.user;
     try {
