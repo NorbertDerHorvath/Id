@@ -55,7 +55,7 @@
             <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th><th>Plate</th><th>Start</th><th>End</th><th>Breaks</th><th>Net Time</th><th>Distance</th>
+                        <th>User</th><th>Plate</th><th>Start</th><th>End</th><th>Breaks</th><th>Net Time</th><th>Distance</th><th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="workday-table-body"></tbody>
@@ -67,7 +67,7 @@
              <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th>
+                        <th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th><th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="refuel-table-body"></tbody>
@@ -215,7 +215,7 @@
 
         async function loadWorkdayEvents() {
             const tableBody = document.getElementById('workday-table-body');
-            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Loading...</td></tr>';
             
             const params = new URLSearchParams();
             if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
@@ -230,12 +230,18 @@
                 if (!res.ok) throw new Error((await res.json()).error);
                 const events = await res.json();
                 tableBody.innerHTML = '';
-                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No data found.</td></tr>';
+                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No data found.</td></tr>';
 
                 events.forEach(e => {
                     const start = new Date(e.startTime);
                     const end = e.endTime ? new Date(e.endTime) : null;
                     const netTime = end ? (end - start) - (e.breakTime * 60000) : 0;
+                    const actions = (currentUserRole === 'superadmin' || e.userId === parseJwt(localStorage.getItem('token')).userId) ? 
+                        `<td>
+                            <button class="btn btn-sm btn-info" onclick="window.location.href='/edit_workday.html?id=${e.id}'">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteWorkdayEvent(${e.id})">Delete</button>
+                        </td>` : '<td></td>';
+
                     tableBody.innerHTML += `
                         <tr>
                             <td>${e.User?.realName || e.User?.username}</td>
@@ -245,15 +251,25 @@
                             <td>${e.breakTime || 0} min</td>
                             <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
                             <td>${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
+                            ${actions}
                         </tr>
                     `;
                 });
-            } catch (e) { tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${e.message}</td></tr>`; }
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${e.message}</td></tr>`; }
+        }
+
+        async function deleteWorkdayEvent(id) {
+            if (!confirm('Are you sure you want to delete this workday event?')) return;
+            try {
+                const res = await fetch(`/api/workday-events/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+                if (!res.ok) throw new Error((await res.json()).error);
+                loadWorkdayEvents();
+            } catch (e) { alert(e.message); }
         }
 
         async function loadRefuelEvents() {
             const tableBody = document.getElementById('refuel-table-body');
-            tableBody.innerHTML = '<tr><td colspan="9" class="text-center">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Loading...</td></tr>';
             
             const params = new URLSearchParams();
              if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
@@ -268,9 +284,15 @@
                 if (!res.ok) throw new Error((await res.json()).error);
                 const events = await res.json();
                 tableBody.innerHTML = '';
-                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No data found.</td></tr>';
+                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data found.</td></tr>';
                 
                 events.forEach(e => {
+                    const actions = (currentUserRole === 'superadmin' || e.userId === parseJwt(localStorage.getItem('token')).userId) ? 
+                        `<td>
+                            <button class="btn btn-sm btn-info" onclick="window.location.href='/edit_refuel.html?id=${e.id}'">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRefuelEvent(${e.id})">Delete</button>
+                        </td>` : '<td></td>';
+
                     tableBody.innerHTML += `
                         <tr>
                             <td>${e.User?.realName || e.User?.username}</td>
@@ -282,11 +304,21 @@
                             <td>${e.value ? e.value.toFixed(2) + ' currency' : '-'}</td>
                             <td>${e.paymentMethod}</td>
                             <td>-</td>
+                            ${actions}
                         </tr>
                     `;
                 });
 
-            } catch (e) { tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger">${e.message}</td></tr>`; }
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">${e.message}</td></tr>`; }
+        }
+
+        async function deleteRefuelEvent(id) {
+            if (!confirm('Are you sure you want to delete this refuel event?')) return;
+            try {
+                const res = await fetch(`/api/refuel-events/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+                if (!res.ok) throw new Error((await res.json()).error);
+                loadRefuelEvents();
+            } catch (e) { alert(e.message); }
         }
         
         async function handleManualWorkdaySubmit(e) {

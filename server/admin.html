@@ -27,6 +27,7 @@
                     <option value="all">All Companies</option>
                 </select>
             </div>
+            <button class="btn btn-info" id="manage-companies-btn" data-toggle="modal" data-target="#companyManagementModal" style="display: none;">Manage Companies</button>
             <button class="btn btn-primary" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
         </div>
         
@@ -120,6 +121,30 @@
         </div>
     </div>
 
+    <!-- Company Management Modal -->
+    <div class="modal fade" id="companyManagementModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Companies</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Admin Email</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="company-management-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
@@ -140,8 +165,10 @@
 
             if (currentUserRole === 'superadmin') {
                 document.getElementById('company-filter-container').style.display = 'block';
+                document.getElementById('manage-companies-btn').style.display = 'block';
                 await loadCompanies();
                 document.getElementById('company-filter').addEventListener('change', () => loadUsers(document.getElementById('company-filter').value));
+                document.getElementById('manage-companies-btn').addEventListener('click', populateCompanyManagementModal);
             }
             loadUsers();
             
@@ -179,6 +206,7 @@
 
                     $('#newCompanyModal').modal('hide');
                     document.getElementById('new-company-form').reset();
+                    await loadCompanies(); 
                 } catch (error) {
                     alert('Error creating company: ' + error.message);
                 }
@@ -201,6 +229,42 @@
                 });
             } catch (error) {
                 console.error('Error loading companies:', error);
+            }
+        }
+
+        function populateCompanyManagementModal() {
+            const tableBody = document.getElementById('company-management-table-body');
+            tableBody.innerHTML = '';
+            companies.forEach(c => {
+                tableBody.innerHTML += `
+                    <tr>
+                        <td>${c.name}</td>
+                        <td>${c.adminEmail}</td>
+                        <td><button class="btn btn-sm btn-danger" onclick='deleteCompany("${c.id}")'>Delete</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function deleteCompany(companyId) {
+            if (!confirm('Are you sure you want to delete this company? This will also delete all associated users.')) return;
+
+            try {
+                const response = await fetch(`/api/companies/${companyId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Delete failed');
+                }
+                await loadCompanies();
+                allUsers = [];
+                loadUsers();
+                populateCompanyManagementModal();
+            } catch (error) {
+                alert('Error deleting company: ' + error.message);
             }
         }
 

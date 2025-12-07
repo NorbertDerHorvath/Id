@@ -63,6 +63,18 @@ app.post('/api/companies', authenticateToken, async (req, res) => {
     }
 });
 
+app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+    try {
+        const company = await Company.findByPk(req.params.id);
+        if (!company) return res.status(404).json({ error: 'Company not found' });
+        await company.destroy();
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete company.' });
+    }
+});
+
 // Workday Events API
 app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
@@ -115,6 +127,32 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/workday-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await WorkdayEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Workday event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+        
+        await event.update(req.body);
+        res.json(await WorkdayEvent.findByPk(id, { include: User }));
+    } catch (error) { res.status(500).json({ error: 'Failed to update workday event.' }); }
+});
+
+app.delete('/api/workday-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await WorkdayEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Workday event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+        
+        await event.destroy();
+        res.status(204).send();
+    } catch (error) { res.status(500).json({ error: 'Failed to delete workday event.' }); }
+});
+
 // Refuel Events API
 app.get('/api/refuel-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
@@ -159,6 +197,32 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
         const event = await RefuelEvent.create({ ...req.body, userId: targetUserId });
         res.status(201).json(await RefuelEvent.findByPk(event.id, { include: User }));
     } catch (error) { res.status(500).json({ error: 'Failed to save refuel event.' }); }
+});
+
+app.put('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await RefuelEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Refuel event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+
+        await event.update(req.body);
+        res.json(await RefuelEvent.findByPk(id, { include: User }));
+    } catch (error) { res.status(500).json({ error: 'Failed to update refuel event.' }); }
+});
+
+app.delete('/api/refuel-events/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { userId, role } = req.user;
+    try {
+        const event = await RefuelEvent.findByPk(id);
+        if (!event) return res.status(404).json({ error: 'Refuel event not found' });
+        if (role !== 'superadmin' && event.userId !== userId) return res.status(403).json({ error: 'Forbidden' });
+
+        await event.destroy();
+        res.status(204).send();
+    } catch (error) { res.status(500).json({ error: 'Failed to delete refuel event.' }); }
 });
 
 
