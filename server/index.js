@@ -52,6 +52,17 @@ app.get('/api/companies', authenticateToken, async (req, res) => {
     }
 });
 
+app.post('/api/companies', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
+    const { name, adminEmail } = req.body;
+    try {
+        const newCompany = await Company.create({ name, adminEmail });
+        res.status(201).json(newCompany);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create company.' });
+    }
+});
+
 // Workday Events API
 app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;

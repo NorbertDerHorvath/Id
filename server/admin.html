@@ -22,6 +22,11 @@
     <div class="container mt-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2>User Management</h2>
+            <div id="company-filter-container" style="display: none;">
+                <select id="company-filter" class="form-control">
+                    <option value="all">All Companies</option>
+                </select>
+            </div>
             <button class="btn btn-primary" data-toggle="modal" data-target="#userModal" onclick="prepareNewUserModal()">Add New User</button>
         </div>
         
@@ -72,11 +77,42 @@
                         </div>
                         <div class="form-group" id="company-select-group" style="display: none;">
                             <label for="company-select">Company</label>
-                            <select class="form-control" id="company-select"></select>
+                            <select class="form-control" id="company-select">
+                                <option value="">No Company</option>
+                                <option value="new">New Company...</option>
+                            </select>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                             <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Company Modal -->
+    <div class="modal fade" id="newCompanyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Company</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <form id="new-company-form">
+                        <div class="form-group">
+                            <label for="newCompanyName">Company Name</label>
+                            <input type="text" class="form-control" id="newCompanyName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newCompanyAdminEmail">Admin Email</label>
+                            <input type="email" class="form-control" id="newCompanyAdminEmail" required>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Create Company</button>
                         </div>
                     </form>
                 </div>
@@ -90,6 +126,7 @@
         const token = localStorage.getItem('token');
         let currentUserRole = null;
         let companies = [];
+        let allUsers = [];
 
         function parseJwt(token) {
             try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
@@ -102,7 +139,9 @@
             currentUserRole = decodedToken.role;
 
             if (currentUserRole === 'superadmin') {
+                document.getElementById('company-filter-container').style.display = 'block';
                 await loadCompanies();
+                document.getElementById('company-filter').addEventListener('change', () => loadUsers(document.getElementById('company-filter').value));
             }
             loadUsers();
             
@@ -111,6 +150,39 @@
                 localStorage.removeItem('username');
                 window.location.href = '/login.html';
             });
+            
+            document.getElementById('company-select').addEventListener('change', function() {
+                if (this.value === 'new') {
+                    $('#newCompanyModal').modal('show');
+                }
+            });
+
+            document.getElementById('new-company-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const companyName = document.getElementById('newCompanyName').value;
+                const adminEmail = document.getElementById('newCompanyAdminEmail').value;
+                
+                try {
+                    const response = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ name: companyName, adminEmail: adminEmail })
+                    });
+                    if (!response.ok) throw new Error('Failed to create company');
+                    const newCompany = await response.json();
+                    companies.push(newCompany);
+                    
+                    const companySelect = document.getElementById('company-select');
+                    const option = new Option(newCompany.name, newCompany.id, true, true);
+                    companySelect.add(option, companySelect.options[companySelect.options.length-1]);
+                    companySelect.value = newCompany.id;
+
+                    $('#newCompanyModal').modal('hide');
+                    document.getElementById('new-company-form').reset();
+                } catch (error) {
+                    alert('Error creating company: ' + error.message);
+                }
+            });
         });
 
         async function loadCompanies() {
@@ -118,30 +190,43 @@
                 const response = await fetch('/api/companies', { headers: { 'Authorization': `Bearer ${token}` } });
                 companies = await response.json();
                 const companySelect = document.getElementById('company-select');
-                companySelect.innerHTML = '<option value="">No Company</option>';
+                const companyFilter = document.getElementById('company-filter');
+
+                companySelect.innerHTML = '<option value="">No Company</option><option value="new">New Company...</option>';
+                companyFilter.innerHTML = '<option value="all">All Companies</option>';
+
                 companies.forEach(c => {
                     companySelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+                    companyFilter.innerHTML += `<option value="${c.id}">${c.name}</option>`;
                 });
             } catch (error) {
                 console.error('Error loading companies:', error);
             }
         }
 
-        async function loadUsers() {
+        async function loadUsers(companyIdFilter = 'all') {
             const tableBody = document.getElementById('user-table-body');
             try {
-                const response = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || `HTTP error! Status: ${response.status}`);
+                if (allUsers.length === 0) {
+                    const response = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error || `HTTP error! Status: ${response.status}`);
+                    }
+                    allUsers = await response.json();
                 }
-                const users = await response.json();
+
+                let usersToDisplay = allUsers;
+                if (currentUserRole === 'superadmin' && companyIdFilter !== 'all') {
+                    usersToDisplay = allUsers.filter(u => u.companyId === companyIdFilter);
+                }
+
                 tableBody.innerHTML = '';
-                if (users.length === 0) {
+                if (usersToDisplay.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No users found.</td></tr>';
                     return;
                 }
-                users.forEach(user => {
+                usersToDisplay.forEach(user => {
                     tableBody.innerHTML += `
                         <tr>
                             <td>${user.username}</td>
@@ -207,7 +292,8 @@
                     const err = await response.json();
                     throw new Error(err.error || 'Delete failed');
                 }
-                loadUsers();
+                allUsers = allUsers.filter(u => u.id !== userId);
+                loadUsers(document.getElementById('company-filter').value);
             } catch (error) {
                 alert('Error deleting user: ' + error.message);
             }
@@ -239,8 +325,14 @@
                     const err = await response.json();
                     throw new Error(err.error || 'Save failed');
                 }
+                const updatedUser = await response.json();
+                if (userId) {
+                    allUsers = allUsers.map(u => u.id === userId ? updatedUser : u);
+                } else {
+                    allUsers.push(updatedUser);
+                }
                 $('#userModal').modal('hide');
-                loadUsers();
+                loadUsers(document.getElementById('company-filter').value);
             } catch (error) {
                 alert('Error saving user: ' + error.message);
             }
