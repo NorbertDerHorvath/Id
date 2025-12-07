@@ -77,8 +77,10 @@
                     companyIdToEdit = e.target.value;
                     loadSettings();
                 });
-            } else {
+            } else if (currentUserRole === 'admin') {
                  loadSettings(); // Admin loads their own company settings
+            } else {
+                document.getElementById('company-settings-container').innerHTML = '<p>You do not have permission to view this page.</p>';
             }
             
             document.getElementById('logout-btn').addEventListener('click', () => {
@@ -102,7 +104,10 @@
         }
 
         async function loadSettings() {
-            if (!companyIdToEdit) return; // Don't load if no company is selected (for superadmin)
+            if (!companyIdToEdit) {
+                document.getElementById('company-settings-form').reset();
+                return;
+            }
             document.getElementById('currency').value = ''; // Clear old value
             try {
                 const res = await fetch(`/api/settings?companyId=${companyIdToEdit}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
