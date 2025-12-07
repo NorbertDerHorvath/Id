@@ -37,6 +37,22 @@
     <script>
     let userRole = null;
 
+    const fieldLabels = {
+        workday_startTime: 'Munkaidő kezdete',
+        workday_endTime: 'Munkaidő vége',
+        workday_startLocation: 'Indulás helye',
+        workday_endLocation: 'Érkezés helye',
+        workday_carPlate: 'Rendszám',
+        workday_startOdometer: 'Kezdő kilométeróra',
+        workday_endOdometer: 'Záró kilométeróra',
+        workday_breakTime: 'Szünet',
+        refuel_odometer: 'Kilométeróra állás tankoláskor',
+        refuel_fuelType: 'Üzemanyag típusa',
+        refuel_price: 'Ár',
+        refuel_paymentMethod: 'Fizetési mód',
+        refuel_location: 'Tankolás helye',
+    };
+
     document.addEventListener('DOMContentLoaded', async function() {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -103,10 +119,14 @@
 
             companySelect.addEventListener('change', () => {
                 const selectedCompanyId = companySelect.value;
+                 document.getElementById('settings-content').innerHTML = '<p>Loading settings...</p>';
                 if (selectedCompanyId) {
                     loadAdminSettings(selectedCompanyId);
+                } else {
+                    renderSettingsForm(null, null); // Render empty/default form
                 }
             });
+             renderSettingsForm(null, null); // Initial render
         } catch (error) {
             console.error('Error setting up company selection:', error);
             document.getElementById('settings-content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
@@ -136,25 +156,73 @@
 
     function renderSettingsForm(settings, companyId) {
         const settingsContent = document.getElementById('settings-content');
+        if (!settings) {
+             settingsContent.innerHTML = '<p class="text-info">Select a company to manage its settings.</p>';
+             return;
+        }
+
         const maintenanceMode = settings.maintenance_mode === true;
+        const currency = settings.currency || 'Ft';
+
+        let workdayFieldsHtml = '';
+        let refuelFieldsHtml = '';
+
+        for (const [key, label] of Object.entries(fieldLabels)) {
+            const isChecked = settings.fields ? settings.fields[key] : true;
+            const checkbox = `
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="" id="${key}" ${isChecked ? 'checked' : ''}>
+                    <label class="form-check-label" for="${key}">${label}</label>
+                </div>`;
+            if (key.startsWith('workday')) {
+                workdayFieldsHtml += checkbox;
+            } else {
+                refuelFieldsHtml += checkbox;
+            }
+        }
 
         settingsContent.innerHTML = `
             <form id="settings-form">
+                <h5>Általános beállítások</h5>
                 <div class="form-group">
-                    <label for="maintenance-mode">Maintenance Mode</label>
+                    <label for="maintenance-mode">Karbantartó mód</label>
                     <select class="form-control" id="maintenance-mode">
-                        <option value="true" ${maintenanceMode ? 'selected' : ''}>Enabled</option>
-                        <option value="false" ${!maintenanceMode ? 'selected' : ''}>Disabled</option>
+                        <option value="true" ${maintenanceMode ? 'selected' : ''}>Engedélyezve</option>
+                        <option value="false" ${!maintenanceMode ? 'selected' : ''}>Letiltva</option>
                     </select>
                 </div>
-                 <button type="submit" class="btn btn-primary">Save Settings</button>
+                 <div class="form-group">
+                    <label for="currency">Pénznem</label>
+                    <input type="text" class="form-control" id="currency" value="${currency}">
+                </div>
+                <hr>
+                <h5>Adatmezők beállításai</h5>
+                 <div class="row">
+                    <div class="col-md-6">
+                        <h6>Munkaidő mezők</h6>
+                        ${workdayFieldsHtml}
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Tankolás mezők</h6>
+                        ${refuelFieldsHtml}
+                    </div>
+                </div>
+                 <button type="submit" class="btn btn-primary mt-3">Beállítások mentése</button>
             </form>
         `;
 
         document.getElementById('settings-form').addEventListener('submit', async function(e) {
             e.preventDefault();
+
+            const fields = {};
+            for (const key in fieldLabels) {
+                fields[key] = document.getElementById(key).checked;
+            }
+
             const newSettings = {
-                maintenance_mode: document.getElementById('maintenance-mode').value
+                maintenance_mode: document.getElementById('maintenance-mode').value,
+                currency: document.getElementById('currency').value,
+                fields: fields
             };
 
             let body = {
@@ -179,7 +247,7 @@
                     },
                     body: JSON.stringify(body)
                 });
-                if (!response.ok) throw new Error('Failed to save settings');
+                if (!response.ok) throw new Error(await response.text());
                 alert('Settings saved successfully!');
             } catch (error) {
                 alert(`Error saving settings: ${error.message}`);

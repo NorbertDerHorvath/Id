@@ -16,6 +16,45 @@ app.use(express.static(__dirname));
 
 console.log('Middleware configured.');
 
+// --- SETTINGS DEFAULTS ---
+const defaultSettings = {
+    maintenance_mode: false,
+    currency: 'Ft',
+    fields: {
+        workday_startTime: true,
+        workday_endTime: true,
+        workday_startLocation: true,
+        workday_endLocation: true,
+        workday_carPlate: true,
+        workday_startOdometer: true,
+        workday_endOdometer: true,
+        workday_breakTime: true,
+        refuel_odometer: true,
+        refuel_fuelType: true,
+        refuel_price: true,
+        refuel_paymentMethod: true,
+        refuel_location: true,
+    }
+};
+
+// Deep merge function for settings
+const mergeSettings = (savedSettings) => {
+    const finalSettings = JSON.parse(JSON.stringify(defaultSettings)); // Deep copy
+    if (!savedSettings) return finalSettings;
+
+    finalSettings.maintenance_mode = savedSettings.maintenance_mode !== undefined ? savedSettings.maintenance_mode : finalSettings.maintenance_mode;
+    finalSettings.currency = savedSettings.currency || finalSettings.currency;
+    if (savedSettings.fields) {
+        for (const key in finalSettings.fields) {
+            if (savedSettings.fields[key] !== undefined) {
+                finalSettings.fields[key] = savedSettings.fields[key];
+            }
+        }
+    }
+    return finalSettings;
+};
+
+
 app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
 app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
@@ -47,6 +86,17 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.get('/api/my-settings', authenticateToken, async (req, res) => {
+    try {
+        const settings = await db.Settings.findOne({ where: { companyId: req.user.companyId } });
+        const finalSettings = mergeSettings(settings ? settings.settings : {});
+        res.json(finalSettings);
+    } catch (error) {
+        console.error('Error loading my-settings:', error);
+        res.status(500).json({ error: 'Failed to load company settings.' });
+    }
+});
+
 app.get('/api/settings', authenticateToken, async (req, res) => {
     console.log(`GET /api/settings request received for user: ${req.user.userId}`);
     const { role, companyId } = req.user;
@@ -56,8 +106,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
         if (req.query.companyId) {
             targetCompanyId = req.query.companyId;
         } else {
-            // Superadmin must specify a company
-            return res.status(400).json({ error: 'Company ID is required for superadmin.' });
+            return res.json(defaultSettings); // For superadmin, if no company is selected, send defaults
         }
     } else if (role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden' });
@@ -65,14 +114,9 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
 
     try {
         const settings = await db.Settings.findOne({ where: { companyId: targetCompanyId } });
-        let currentSettings = settings ? settings.settings : {};
-        if (currentSettings.maintenance_mode !== undefined) {
-            currentSettings.maintenance_mode = String(currentSettings.maintenance_mode).toLowerCase() === 'true';
-        } else {
-            currentSettings.maintenance_mode = false; 
-        }
-        console.log('Settings fetched from DB for company:', targetCompanyId, currentSettings);
-        res.json(currentSettings);
+        const finalSettings = mergeSettings(settings ? settings.settings : {});
+        console.log('Settings fetched from DB for company:', targetCompanyId, finalSettings);
+        res.json(finalSettings);
     } catch (error) {
         console.error('Error loading settings:', error);
         res.status(500).json({ error: 'Failed to load settings.' });
@@ -95,17 +139,28 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
     }
 
     try {
+        // Ensure boolean values are correct from checkbox values
         if (newSettings.maintenance_mode !== undefined) {
             newSettings.maintenance_mode = newSettings.maintenance_mode === 'true' || newSettings.maintenance_mode === true;
+        }
+        if (newSettings.fields) {
+            for (const key in newSettings.fields) {
+                 newSettings.fields[key] = newSettings.fields[key] === 'true' || newSettings.fields[key] === true;
+            }
         }
 
         let settings = await db.Settings.findOne({ where: { companyId: targetCompanyId } });
         if (settings) {
-            settings.settings = { ...settings.settings, ...newSettings };
+            const mergedSettings = mergeSettings(settings.settings);
+            mergedSettings.maintenance_mode = newSettings.maintenance_mode;
+            mergedSettings.currency = newSettings.currency;
+            mergedSettings.fields = { ...mergedSettings.fields, ...newSettings.fields };
+            settings.settings = mergedSettings;
             settings.changed('settings', true);
             await settings.save();
         } else {
-            settings = await db.Settings.create({ companyId: targetCompanyId, settings: newSettings });
+            const finalSettings = mergeSettings(newSettings);
+            settings = await db.Settings.create({ companyId: targetCompanyId, settings: finalSettings });
         }
         console.log('Settings saved to DB for company:', targetCompanyId, settings.settings);
         res.status(200).json({ message: 'Settings saved', settings: settings.settings });
