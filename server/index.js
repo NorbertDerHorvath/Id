@@ -16,11 +16,11 @@ app.use(express.static(__dirname));
 
 // HTML Serving
 app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
-app.get('/dashboard', authenticateToken, (req, res) => { res.sendFile(__dirname + '/index.html'); });
-app.get('/admin', authenticateToken, (req, res) => { res.sendFile(__dirname + '/admin.html'); });
-app.get('/settings', authenticateToken, (req, res) => { res.sendFile(__dirname + '/settings.html'); });
-app.get('/edit_workday.html', authenticateToken, (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
-app.get('/edit_refuel.html', authenticateToken, (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
+app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
+app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
+app.get('/settings', (req, res) => { res.sendFile(__dirname + '/settings.html'); });
+app.get('/edit_workday.html', (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
+app.get('/edit_refuel.html', (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
 
 // --- API Routes ---
 
@@ -104,7 +104,7 @@ app.get('/api/companies', authenticateToken, async (req, res) => {
     }
 });
 
-// Workday & Refuel Events API ... (Keep the existing workday/refuel GET/POST endpoints)
+// Workday & Refuel Events API ...
 app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
@@ -198,10 +198,7 @@ app.post('/api/refuel-events', authenticateToken, async (req, res) => {
 
 // --- Admin & Superadmin Routes ---
 const adminRouter = express.Router();
-adminRouter.use(authenticateToken, (req, res, next) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
-    next();
-});
+adminRouter.use(authenticateToken);
 
 adminRouter.get('/users', async (req, res) => {
     const { companyId, role } = req.user;
@@ -212,61 +209,6 @@ adminRouter.get('/users', async (req, res) => {
         }
         res.json(await User.findAll(queryOptions));
     } catch (error) { res.status(500).json({ error: 'Failed to fetch users.' }); }
-});
-
-adminRouter.post('/users', async (req, res) => {
-    let { username, password, role, realName, companyId, newCompanyName } = req.body;
-    const { role: adminRole, companyId: adminCompanyId } = req.user;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' });
-
-    try {
-        if (adminRole === 'admin') {
-            companyId = adminCompanyId;
-            if (role === 'superadmin') return res.status(403).json({ error: 'Admins cannot create superadmins.' });
-        }
-
-        if (adminRole === 'superadmin' && newCompanyName) {
-            const [company] = await Company.findOrCreate({ where: { name: newCompanyName }, defaults: { name: newCompanyName, adminEmail: `${username}@company.com` } });
-            companyId = company.id;
-        }
-
-        if (!companyId && role !== 'superadmin') return res.status(400).json({ error: 'Company is required.' });
-
-        const newUser = await User.create({ username, password, realName, role, companyId });
-        res.status(201).json(newUser);
-    } catch (error) {
-        if (error.name === 'SequelizeUniqueConstraintError') return res.status(409).json({ error: 'Username already exists.' });
-        res.status(500).json({ error: 'Server error while creating user.' });
-    }
-});
-
-adminRouter.put('/users/:userId', async (req, res) => {
-    const { userId: targetUserId } = req.params;
-    let { password, role, realName, companyId, newCompanyName } = req.body;
-    const { companyId: adminCompanyId, role: adminRole } = req.user;
-
-    try {
-        const userToUpdate = await User.findByPk(targetUserId);
-        if (!userToUpdate) return res.status(404).json({ error: 'User not found.' });
-
-        if (userToUpdate.role === 'superadmin' && adminRole !== 'superadmin') return res.status(403).json({ error: 'Permission denied to edit superadmin.' });
-        if (adminRole === 'admin' && userToUpdate.companyId !== adminCompanyId) return res.status(403).json({ error: 'Admins can only edit users in their own company.' });
-        if (adminRole === 'admin' && role === 'superadmin') return res.status(403).json({ error: 'Admins cannot promote to superadmin.' });
-
-        if (password) userToUpdate.password = await bcrypt.hash(password, 10);
-        if (realName) userToUpdate.realName = realName;
-        if (role) userToUpdate.role = role;
-        
-        if (adminRole === 'superadmin' && newCompanyName) {
-            const [company] = await Company.findOrCreate({ where: { name: newCompanyName }, defaults: { name: newCompanyName, adminEmail: `${userToUpdate.username}@company.com` } });
-            userToUpdate.companyId = company.id;
-        } else if (companyId) {
-             userToUpdate.companyId = companyId;
-        }
-
-        await userToUpdate.save();
-        res.json(userToUpdate);
-    } catch (error) { res.status(500).json({ error: 'Failed to update user.' }); }
 });
 
 app.use('/api/admin', adminRouter);

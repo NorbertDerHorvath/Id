@@ -38,7 +38,16 @@
                     <label for="currency">Currency</label>
                     <input type="text" class="form-control" id="currency" placeholder="e.g., HUF, EUR, USD">
                 </div>
-                <button type="submit" class="btn btn-primary">Save Company Settings</button>
+                
+                <h5>Visible Fields</h5>
+                <div id="visible-fields-container" class="mb-3"></div>
+                
+                <h5>Custom Fields</h5>
+                <div id="custom-fields-container"></div>
+                <button type="button" class="btn btn-secondary btn-sm mt-2" id="add-custom-field">+ Add Custom Field</button>
+
+                <hr>
+                <button type="submit" class="btn btn-primary mt-3">Save Company Settings</button>
             </form>
         </div>
 
@@ -49,6 +58,10 @@
     <script>
         let currentUserRole = null;
         let companyIdToEdit = null;
+        const defaultFields = {
+            workday: ['carPlate', 'startTime', 'startLocation', 'startOdometer', 'endTime', 'endLocation', 'endOdometer', 'breakTime', 'netTime', 'distance'],
+            refuel: ['timestamp', 'location', 'odometer', 'fuelType', 'fuelAmount', 'value', 'paymentMethod']
+        };
 
         function parseJwt(token) {
             try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
@@ -61,7 +74,7 @@
             const decodedToken = parseJwt(token);
             if (!decodedToken) { window.location.href = '/login.html'; return; }
             currentUserRole = decodedToken.role;
-            companyIdToEdit = decodedToken.companyId; // Default for admin
+            companyIdToEdit = decodedToken.companyId;
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
 
             const navLinks = document.getElementById('nav-links');
@@ -78,7 +91,7 @@
                     loadSettings();
                 });
             } else if (currentUserRole === 'admin') {
-                 loadSettings(); // Admin loads their own company settings
+                 loadSettings();
             } else {
                 document.getElementById('company-settings-container').innerHTML = '<p>You do not have permission to view this page.</p>';
             }
@@ -88,6 +101,7 @@
                 window.location.href = '/login.html';
             });
 
+            document.getElementById('add-custom-field').addEventListener('click', () => addCustomField());
             document.getElementById('company-settings-form').addEventListener('submit', saveCompanySettings);
         });
 
@@ -106,16 +120,76 @@
         async function loadSettings() {
             if (!companyIdToEdit) {
                 document.getElementById('company-settings-form').reset();
+                renderFieldCheckboxes({});
+                renderCustomFields([]);
                 return;
             }
-            document.getElementById('currency').value = ''; // Clear old value
             try {
                 const res = await fetch(`/api/settings?companyId=${companyIdToEdit}`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }});
                 const data = await res.json();
-                if (data.companySettings.currency) {
-                    document.getElementById('currency').value = data.companySettings.currency;
-                }
+                const settings = data.companySettings || {};
+                document.getElementById('currency').value = settings.currency || 'HUF';
+                renderFieldCheckboxes(settings.visibleFields || {});
+                renderCustomFields(settings.customFields || []);
             } catch (e) { console.error('Failed to load settings', e); }
+        }
+
+        function renderFieldCheckboxes(visibleFields) {
+            const container = document.getElementById('visible-fields-container');
+            container.innerHTML = '';
+            Object.keys(defaultFields).forEach(type => {
+                container.innerHTML += `<h6>${type.charAt(0).toUpperCase() + type.slice(1)} Fields</h6>`;
+                defaultFields[type].forEach(field => {
+                    const isChecked = visibleFields[field] !== false; // Visible by default
+                    container.innerHTML += `
+                        <div class="form-check form-check-inline">
+                           <input class="form-check-input" type="checkbox" id="field-${field}" value="${field}" ${isChecked ? 'checked' : ''}>
+                           <label class="form-check-label" for="field-${field}">${field}</label>
+                        </div>
+                    `;
+                });
+            });
+        }
+
+        function renderCustomFields(customFields) {
+            const container = document.getElementById('custom-fields-container');
+            container.innerHTML = '';
+            customFields.forEach((field, index) => {
+                container.innerHTML += `
+                    <div class="input-group mb-2">
+                        <input type="text" class="form-control" value="${field.name}" placeholder="Field Name">
+                         <select class="form-control">
+                            <option value="text" ${field.type === 'text' ? 'selected' : ''}>Text</option>
+                            <option value="number" ${field.type === 'number' ? 'selected' : ''}>Number</option>
+                            <option value="date" ${field.type === 'date' ? 'selected' : ''}>Date</option>
+                        </select>
+                        <div class="input-group-append">
+                            <button class="btn btn-danger" type="button" onclick="removeCustomField(this)">X</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addCustomField() {
+            const container = document.getElementById('custom-fields-container');
+             container.innerHTML += `
+                <div class="input-group mb-2">
+                    <input type="text" class="form-control" placeholder="Field Name">
+                    <select class="form-control">
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="date">Date</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-danger" type="button" onclick="removeCustomField(this)">X</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function removeCustomField(button) {
+            button.closest('.input-group').remove();
         }
 
         async function saveCompanySettings(event) {
@@ -125,7 +199,23 @@
                 return;
             }
 
-            const settings = { currency: document.getElementById('currency').value };
+            const visibleFields = {};
+            document.querySelectorAll('#visible-fields-container input[type="checkbox"]').forEach(box => {
+                visibleFields[box.value] = box.checked;
+            });
+
+            const customFields = [];
+            document.querySelectorAll('#custom-fields-container .input-group').forEach(group => {
+                const name = group.querySelector('input').value;
+                const type = group.querySelector('select').value;
+                if (name) customFields.push({ name, type });
+            });
+
+            const settings = { 
+                currency: document.getElementById('currency').value,
+                visibleFields,
+                customFields
+            };
 
             try {
                 const res = await fetch('/api/settings', {
