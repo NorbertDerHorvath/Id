@@ -7,6 +7,7 @@
     <style>
         body { font-size: 0.875rem; }
         .table-responsive { max-height: 400px; }
+        th, td { white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -323,7 +324,7 @@
                 odometer: document.getElementById('manual-refuel-odo').value,
                 fuelType: document.getElementById('manual-refuel-type').value,
                 fuelAmount: document.getElementById('manual-refuel-amount').value,
-                price: document.getElementById('manual-refuel-price').value,
+                value: document.getElementById('manual-refuel-price').value,
                 paymentMethod: document.getElementById('manual-refuel-payment').value,
             };
             try {

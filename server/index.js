@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent } = require('./models');
+const { sequelize, Company, User, WorkdayEvent, RefuelEvent, LoadingEvent, Settings } = require('./models');
 const { Op } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const authenticateToken = require('./middleware/authenticateToken');
@@ -18,6 +18,7 @@ app.use(express.static(__dirname));
 app.get('/', (req, res) => { res.sendFile(__dirname + '/login.html'); });
 app.get('/dashboard', (req, res) => { res.sendFile(__dirname + '/index.html'); });
 app.get('/admin', (req, res) => { res.sendFile(__dirname + '/admin.html'); });
+app.get('/settings', (req, res) => { res.sendFile(__dirname + '/settings.html'); });
 app.get('/edit_workday.html', (req, res) => { res.sendFile(__dirname + '/edit_workday.html'); });
 app.get('/edit_refuel.html', (req, res) => { res.sendFile(__dirname + '/edit_refuel.html'); });
 
@@ -41,6 +42,48 @@ app.post('/api/login', async (req, res) => {
 });
 app.get('/api/validate-token', authenticateToken, (req, res) => res.json({ valid: true }));
 
+// Settings API
+app.get('/api/settings', authenticateToken, async (req, res) => {
+    const { userId, companyId } = req.user;
+    try {
+        let userSettings = await Settings.findOne({ where: { userId } });
+        let companySettings = await Settings.findOne({ where: { companyId } });
+
+        if (!userSettings) {
+            userSettings = await Settings.create({ userId, settings: {} });
+        }
+        if (!companySettings && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+            companySettings = await Settings.create({ companyId, settings: {} });
+        }
+
+        res.json({ userSettings: userSettings?.settings || {}, companySettings: companySettings?.settings || {} });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to get settings.' });
+    }
+});
+
+app.post('/api/settings', authenticateToken, async (req, res) => {
+    const { userId, companyId, role } = req.user;
+    const { settings, level } = req.body;
+
+    if ((level === 'company' && role !== 'admin' && role !== 'superadmin') || !level) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const where = level === 'user' ? { userId } : { companyId };
+
+    try {
+        const [setting, created] = await Settings.findOrCreate({ where, defaults: { settings, ...where } });
+        if (!created) {
+            const newSettings = { ...setting.settings, ...settings };
+            await setting.update({ settings: newSettings });
+        }
+        res.status(200).json(setting);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to save settings.' });
+    }
+});
+
 // Company routes (for superadmin)
 app.get('/api/companies', authenticateToken, async (req, res) => {
     if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
@@ -52,7 +95,7 @@ app.get('/api/companies', authenticateToken, async (req, res) => {
     }
 });
 
-// Workday Events API
+// Workday & Refuel Events API
 app.get('/api/workday-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
@@ -98,7 +141,6 @@ app.post('/api/workday-events', authenticateToken, async (req, res) => {
     } catch (error) { res.status(500).json({ error: 'Failed to save workday event.' }); }
 });
 
-// Refuel Events API
 app.get('/api/refuel-events', authenticateToken, async (req, res) => {
     const { startDate, endDate, carPlate, userId: queryUserId, companyId: queryCompanyId } = req.query;
     const { userId, role, companyId } = req.user;
