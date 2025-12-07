@@ -33,10 +33,10 @@
         const loginForm = document.getElementById('login-form');
         const errorDiv = document.getElementById('error');
 
-        // If there's a token, try to go to dashboard. The server will deny if invalid.
-        if (localStorage.getItem('token')) {
-            window.location.href = '/dashboard';
-        }
+        // On page load, clear any old tokens to prevent issues.
+        // The user must always log in from this page.
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
