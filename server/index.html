@@ -55,7 +55,14 @@
             <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th><th>Plate</th><th>Start</th><th>End</th><th>Breaks</th><th>Net Time</th><th>Distance</th><th>Actions</th>
+                        <th>User</th>
+                        <th data-field="workday_carPlate">Plate</th>
+                        <th data-field="workday_startTime">Start</th>
+                        <th data-field="workday_endTime">End</th>
+                        <th data-field="workday_breakTime">Breaks</th>
+                        <th>Net Time</th>
+                        <th data-field="workday_endOdometer">Distance</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="workday-table-body"></tbody>
@@ -67,7 +74,17 @@
              <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th><th>Date</th><th>Location</th><th>Odometer</th><th>Plate</th><th>Fuel Type</th><th>Amount (L)</th><th>Price</th><th>Payment</th><th>Avg. Cons.</th><th>Actions</th>
+                        <th>User</th>
+                        <th>Date</th>
+                        <th data-field="refuel_location">Location</th>
+                        <th data-field="refuel_odometer">Odometer</th>
+                        <th data-field="workday_carPlate">Plate</th>
+                        <th data-field="refuel_fuelType">Fuel Type</th>
+                        <th>Amount (L)</th>
+                        <th data-field="refuel_price">Price</th>
+                        <th data-field="refuel_paymentMethod">Payment</th>
+                        <th>Avg. Cons.</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="refuel-table-body"></tbody>
@@ -180,8 +197,7 @@
             document.getElementById('manual-work-form').addEventListener('submit', handleManualWorkdaySubmit);
             document.getElementById('manual-refuel-form').addEventListener('submit', handleManualRefuelSubmit);
 
-            fetchData(); // Initial data load
-            applyFieldSettings();
+            await fetchData(); // Initial data load
         });
 
         async function loadCompanySettings() {
@@ -189,27 +205,38 @@
                 const res = await fetch('/api/my-settings', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
                 if (res.ok) {
                     companySettings = await res.json();
+                } else { // Fallback to default if fetch fails
+                    companySettings = { fields: {} };
                 }
             } catch (e) {
                 console.error('Could not load company settings', e);
+                companySettings = { fields: {} };
             }
         }
         
         function applyFieldSettings() {
-            if (companySettings.fields) {
-                for (const key in companySettings.fields) {
-                    const fieldElement = document.querySelector(`[data-field="${key}"]`);
-                    if (fieldElement) {
-                        fieldElement.style.display = companySettings.fields[key] ? '' : 'none';
+            document.querySelectorAll('[data-field]').forEach(el => {
+                const key = el.getAttribute('data-field');
+                let show = true; // Default to show if settings are not defined
+                
+                // Special case for Distance column, depends on two fields
+                if (key === 'workday_endOdometer' && el.tagName === 'TH') {
+                    if (companySettings.fields) {
+                       show = companySettings.fields['workday_startOdometer'] && companySettings.fields['workday_endOdometer'];
                     }
+                } else if (companySettings.fields && companySettings.fields[key] !== undefined) {
+                    show = companySettings.fields[key];
                 }
-            }
-             document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = companySettings.currency || 'Ft');
+
+                el.style.display = show ? '' : 'none';
+            });
+
+            document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = companySettings.currency || 'Ft');
         }
 
         async function fetchData() {
-            loadWorkdayEvents();
-            loadRefuelEvents();
+            await Promise.all([loadWorkdayEvents(), loadRefuelEvents()]);
+            applyFieldSettings(); // Apply settings after data is fetched and rendered
         }
 
         async function populateCompanyFilter() {
@@ -276,12 +303,12 @@
                     tableBody.innerHTML += `
                         <tr>
                             <td>${e.User?.realName || e.User?.username}</td>
-                            <td>${e.carPlate || '-'}</td>
-                            <td>${start.toLocaleString()} - ${e.startLocation || '-'} (${e.startOdometer || '-'} km)</td>
-                            <td>${end ? `${end.toLocaleString()} - ${e.endLocation || '-'} (${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
-                            <td>${e.breakTime || 0} min</td>
+                            <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
+                            <td data-field="workday_startTime">${start.toLocaleString()} - ${e.startLocation || '-'} (${e.startOdometer || '-'} km)</td>
+                            <td data-field="workday_endTime">${end ? `${end.toLocaleString()} - ${e.endLocation || '-'} (${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
+                            <td data-field="workday_breakTime">${e.breakTime || 0} min</td>
                             <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
-                            <td>${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
+                            <td data-field="workday_endOdometer">${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
                             ${actions}
                         </tr>
                     `;
@@ -294,7 +321,7 @@
             try {
                 const res = await fetch(`/api/workday-events/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
                 if (!res.ok) throw new Error((await res.json()).error);
-                loadWorkdayEvents();
+                fetchData();
             } catch (e) { alert(e.message); }
         }
 
@@ -328,13 +355,13 @@
                         <tr>
                             <td>${e.User?.realName || e.User?.username}</td>
                             <td>${new Date(e.timestamp).toLocaleString()}</td>
-                            <td>${e.location || '-'}</td>
-                            <td>${e.odometer} km</td>
-                            <td>${e.carPlate || '-'}</td>
-                            <td>${e.fuelType}</td>
+                            <td data-field="refuel_location">${e.location || '-'}</td>
+                            <td data-field="refuel_odometer">${e.odometer} km</td>
+                            <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
+                            <td data-field="refuel_fuelType">${e.fuelType}</td>
                             <td>${e.fuelAmount} L</td>
-                            <td>${e.value ? e.value.toFixed(2) + ' ' + (companySettings.currency || 'Ft') : '-'}</td>
-                            <td>${e.paymentMethod}</td>
+                            <td data-field="refuel_price">${e.value ? e.value.toFixed(2) + ' ' + (companySettings.currency || 'Ft') : '-'}</td>
+                            <td data-field="refuel_paymentMethod">${e.paymentMethod}</td>
                             <td>-</td>
                             ${actions}
                         </tr>
@@ -349,7 +376,7 @@
             try {
                 const res = await fetch(`/api/refuel-events/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
                 if (!res.ok) throw new Error((await res.json()).error);
-                loadRefuelEvents();
+                fetchData();
             } catch (e) { alert(e.message); }
         }
         
