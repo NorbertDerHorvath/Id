@@ -38,33 +38,27 @@
     let userRole = null;
 
     const fieldLabels = {
-        workday_startTime: 'Munkaidő kezdete',
-        workday_endTime: 'Munkaidő vége',
-        workday_startLocation: 'Indulás helye',
-        workday_endLocation: 'Érkezés helye',
+        workday_startTime: 'Időpont',
+        workday_startLocation: 'Helyszín',
+        workday_startOdometer: 'Kilométeróra',
+        workday_endTime: 'Időpont',
+        workday_endLocation: 'Helyszín',
+        workday_endOdometer: 'Kilométeróra',
         workday_carPlate: 'Rendszám',
-        workday_startOdometer: 'Kezdő kilométeróra',
-        workday_endOdometer: 'Záró kilométeróra',
         workday_breakTime: 'Szünet',
-        refuel_odometer: 'Kilométeróra állás tankoláskor',
+        refuel_odometer: 'Kilométeróra állás',
         refuel_fuelType: 'Üzemanyag típusa',
         refuel_price: 'Ár',
         refuel_paymentMethod: 'Fizetési mód',
-        refuel_location: 'Tankolás helye',
+        refuel_location: 'Helyszín',
     };
 
     document.addEventListener('DOMContentLoaded', async function() {
         const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/login.html';
-            return;
-        }
+        if (!token) { window.location.href = '/login.html'; return; }
 
         const decodedToken = parseJwt(token);
-        if (!decodedToken) {
-            window.location.href = '/login.html';
-            return;
-        }
+        if (!decodedToken) { window.location.href = '/login.html'; return; }
         userRole = decodedToken.role;
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
 
@@ -74,10 +68,7 @@
         }
 
         if (window.location.pathname.endsWith('settings')) {
-            if (!isAdmin) {
-                 window.location.href = '/dashboard';
-                 return;
-            }
+            if (!isAdmin) { window.location.href = '/dashboard'; return; }
             if (userRole === 'superadmin') {
                 await setupCompanySelection();
             } else {
@@ -86,7 +77,6 @@
         }
 
         document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
-
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.clear();
             window.location.href = '/login.html';
@@ -103,11 +93,8 @@
         companySelectionContainer.style.display = 'block';
 
         try {
-            const response = await fetch('/api/admin/companies', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const response = await fetch('/api/admin/companies', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
             if (!response.ok) throw new Error('Failed to load companies');
-
             const companies = await response.json();
             companySelect.innerHTML = '<option value="">Select a company...</option>';
             companies.forEach(company => {
@@ -116,15 +103,11 @@
                 option.textContent = company.name;
                 companySelect.appendChild(option);
             });
-
             companySelect.addEventListener('change', () => {
                 const selectedCompanyId = companySelect.value;
-                 document.getElementById('settings-content').innerHTML = '<p>Loading settings...</p>';
-                if (selectedCompanyId) {
-                    loadAdminSettings(selectedCompanyId);
-                } else {
-                    renderSettingsForm(null, null); // Render empty/default form
-                }
+                document.getElementById('settings-content').innerHTML = '<p>Loading settings...</p>';
+                if (selectedCompanyId) { loadAdminSettings(selectedCompanyId); } 
+                else { renderSettingsForm(null, null); }
             });
              renderSettingsForm(null, null); // Initial render
         } catch (error) {
@@ -137,21 +120,25 @@
         const settingsContent = document.getElementById('settings-content');
         settingsContent.innerHTML = '<p>Loading settings...</p>';
         let url = '/api/settings';
-        if (userRole === 'superadmin' && companyId) {
-            url += `?companyId=${companyId}`;
-        } 
+        if (userRole === 'superadmin' && companyId) { url += `?companyId=${companyId}`; } 
 
         try {
-            const response = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
             if (!response.ok) throw new Error('Failed to load settings');
-
             const settings = await response.json();
             renderSettingsForm(settings, companyId);
         } catch (error) {
             settingsContent.innerHTML = `<p class="text-danger">Error loading settings: ${error.message}</p>`;
         }
+    }
+
+    function createCheckbox(key, label, settings) {
+        const isChecked = settings.fields ? settings.fields[key] !== false : true; // Default to true
+        return `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="${key}" ${isChecked ? 'checked' : ''}>
+                <label class="form-check-label" for="${key}">${label}</label>
+            </div>`;
     }
 
     function renderSettingsForm(settings, companyId) {
@@ -161,50 +148,50 @@
              return;
         }
 
-        const maintenanceMode = settings.maintenance_mode === true;
-        const currency = settings.currency || 'Ft';
-
-        let workdayFieldsHtml = '';
-        let refuelFieldsHtml = '';
-
-        for (const [key, label] of Object.entries(fieldLabels)) {
-            const isChecked = settings.fields ? settings.fields[key] : true;
-            const checkbox = `
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" value="" id="${key}" ${isChecked ? 'checked' : ''}>
-                    <label class="form-check-label" for="${key}">${label}</label>
-                </div>`;
-            if (key.startsWith('workday')) {
-                workdayFieldsHtml += checkbox;
-            } else {
-                refuelFieldsHtml += checkbox;
-            }
-        }
-
         settingsContent.innerHTML = `
             <form id="settings-form">
                 <h5>Általános beállítások</h5>
                 <div class="form-group">
                     <label for="maintenance-mode">Karbantartó mód</label>
                     <select class="form-control" id="maintenance-mode">
-                        <option value="true" ${maintenanceMode ? 'selected' : ''}>Engedélyezve</option>
-                        <option value="false" ${!maintenanceMode ? 'selected' : ''}>Letiltva</option>
+                        <option value="true" ${settings.maintenance_mode ? 'selected' : ''}>Engedélyezve</option>
+                        <option value="false" ${!settings.maintenance_mode ? 'selected' : ''}>Letiltva</option>
                     </select>
                 </div>
                  <div class="form-group">
                     <label for="currency">Pénznem</label>
-                    <input type="text" class="form-control" id="currency" value="${currency}">
+                    <input type="text" class="form-control" id="currency" value="${settings.currency || 'Ft'}">
                 </div>
                 <hr>
-                <h5>Adatmezők beállításai</h5>
+                <h5>Kötelezően kitöltendő mezők</h5>
                  <div class="row">
                     <div class="col-md-6">
-                        <h6>Munkaidő mezők</h6>
-                        ${workdayFieldsHtml}
+                        <h6>Munkaidő</h6>
+                        <div class="pl-3">
+                            <b>Indulás</b>
+                            ${createCheckbox('workday_startTime', fieldLabels.workday_startTime, settings)}
+                            ${createCheckbox('workday_startLocation', fieldLabels.workday_startLocation, settings)}
+                            ${createCheckbox('workday_startOdometer', fieldLabels.workday_startOdometer, settings)}
+                            <br>
+                            <b>Érkezés</b>
+                            ${createCheckbox('workday_endTime', fieldLabels.workday_endTime, settings)}
+                            ${createCheckbox('workday_endLocation', fieldLabels.workday_endLocation, settings)}
+                            ${createCheckbox('workday_endOdometer', fieldLabels.workday_endOdometer, settings)}
+                             <br>
+                            <b>Egyéb</b>
+                            ${createCheckbox('workday_carPlate', fieldLabels.workday_carPlate, settings)}
+                            ${createCheckbox('workday_breakTime', fieldLabels.workday_breakTime, settings)}
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <h6>Tankolás mezők</h6>
-                        ${refuelFieldsHtml}
+                        <h6>Tankolás</h6>
+                         <div class="pl-3">
+                            ${createCheckbox('refuel_location', fieldLabels.refuel_location, settings)}
+                            ${createCheckbox('refuel_odometer', fieldLabels.refuel_odometer, settings)}
+                            ${createCheckbox('refuel_fuelType', fieldLabels.refuel_fuelType, settings)}
+                            ${createCheckbox('refuel_price', fieldLabels.refuel_price, settings)}
+                            ${createCheckbox('refuel_paymentMethod', fieldLabels.refuel_paymentMethod, settings)}
+                        </div>
                     </div>
                 </div>
                  <button type="submit" class="btn btn-primary mt-3">Beállítások mentése</button>
@@ -213,11 +200,8 @@
 
         document.getElementById('settings-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-
             const fields = {};
-            for (const key in fieldLabels) {
-                fields[key] = document.getElementById(key).checked;
-            }
+            for (const key in fieldLabels) { fields[key] = document.getElementById(key).checked; }
 
             const newSettings = {
                 maintenance_mode: document.getElementById('maintenance-mode').value,
@@ -225,36 +209,24 @@
                 fields: fields
             };
 
-            let body = {
-                newSettings,
-            };
-
+            let body = { newSettings, };
             if (userRole === 'superadmin') {
                 const selectedCompanyId = companyId || document.getElementById('company-select').value;
-                if (!selectedCompanyId) {
-                    alert('Please select a company first.');
-                    return;
-                }
+                if (!selectedCompanyId) { alert('Please select a company first.'); return; }
                 body.targetCompanyId = selectedCompanyId;
             }
 
             try {
                 const response = await fetch('/api/settings', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                     body: JSON.stringify(body)
                 });
                 if (!response.ok) throw new Error(await response.text());
                 alert('Settings saved successfully!');
-            } catch (error) {
-                alert(`Error saving settings: ${error.message}`);
-            }
+            } catch (error) { alert(`Error saving settings: ${error.message}`); }
         });
     }
-
     </script>
 </body>
 </html>

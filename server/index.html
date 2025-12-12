@@ -49,50 +49,57 @@
         </form>
 
         <hr>
-
-        <h4>Workday Events</h4>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th data-role-display="admin,superadmin">User</th>
-                        <th data-field="workday_carPlate">Plate</th>
-                        <th data-field="workday_startTime">Start</th>
-                        <th data-field="workday_endTime">End</th>
-                        <th data-field="workday_breakTime">Breaks</th>
-                        <th>Net Time</th>
-                        <th data-field="workday_endOdometer">Distance</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="workday-table-body"></tbody>
-            </table>
+        <div id="workday-section">
+            <h4>Workday Events</h4>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th data-role-display="admin,superadmin">User</th>
+                            <th data-field="workday_carPlate">Rendszám</th>
+                            <th data-field="workday_startTime">Indulás ideje</th>
+                            <th data-field="workday_startLocation">Indulás helye</th>
+                            <th data-field="workday_startOdometer">Induló km</th>
+                            <th data-field="workday_endTime">Érkezés ideje</th>
+                            <th data-field="workday_endLocation">Érkezés helye</th>
+                            <th data-field="workday_endOdometer">Érkező km</th>
+                            <th data-field="workday_breakTime">Szünet</th>
+                            <th>Nettó idő</th>
+                            <th data-field="workday_endOdometer">Táv</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="workday-table-body"></tbody>
+                </table>
+            </div>
         </div>
 
-        <h4 class="mt-4">Refuel Events</h4>
-        <div class="table-responsive">
-             <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th data-role-display="admin,superadmin">User</th>
-                        <th>Date</th>
-                        <th data-field="refuel_location">Location</th>
-                        <th data-field="refuel_odometer">Odometer</th>
-                        <th data-field="workday_carPlate">Plate</th>
-                        <th data-field="refuel_fuelType">Fuel Type</th>
-                        <th>Amount (L)</th>
-                        <th data-field="refuel_price">Price</th>
-                        <th data-field="refuel_paymentMethod">Payment</th>
-                        <th>Avg. Cons.</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="refuel-table-body"></tbody>
-            </table>
+        <div id="refuel-section" class="mt-4">
+            <h4>Refuel Events</h4>
+            <div class="table-responsive">
+                 <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th data-role-display="admin,superadmin">User</th>
+                            <th>Dátum</th>
+                            <th data-field="refuel_location">Helyszín</th>
+                            <th data-field="refuel_odometer">Kilométeróra</th>
+                            <th data-field="workday_carPlate">Rendszám</th>
+                            <th data-field="refuel_fuelType">Üzemanyag</th>
+                            <th>Mennyiség (L)</th>
+                            <th data-field="refuel_price">Ár</th>
+                            <th data-field="refuel_paymentMethod">Fizetési mód</th>
+                            <th>Átlagfogy.</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="refuel-table-body"></tbody>
+                </table>
+            </div>
         </div>
     </div>
     
-    <!-- Manual Entry Modal -->
+<!-- Manual Entry Modal -->
 <div class="modal fade" id="manualEntryModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -106,42 +113,46 @@
                     <select id="manual-user-select" class="form-control"></select>
                 </div>
                 <hr>
-                <h6>Workday Entry</h6>
-                <form id="manual-work-form">
-                    <div class="form-row">
-                        <div class="form-group col-md-6" data-field="workday_startTime"><label>Start Time</label><input type="datetime-local" class="form-control" id="manual-start-time"></div>
-                        <div class="form-group col-md-6" data-field="workday_endTime"><label>End Time</label><input type="datetime-local" class="form-control" id="manual-end-time"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-6" data-field="workday_startLocation"><label>Start Location</label><input type="text" class="form-control" id="manual-start-location"></div>
-                        <div class="form-group col-md-6" data-field="workday_endLocation"><label>End Location</label><input type="text" class="form-control" id="manual-end-location"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group col-md-3" data-field="workday_carPlate"><label>Car Plate</label><input type="text" class="form-control" id="manual-car-plate"></div>
-                        <div class="form-group col-md-3" data-field="workday_startOdometer"><label>Start Odometer</label><input type="number" class="form-control" id="manual-start-odo"></div>
-                        <div class="form-group col-md-3" data-field="workday_endOdometer"><label>End Odometer</label><input type="number" class="form-control" id="manual-end-odo"></div>
-                        <div class="form-group col-md-3" data-field="workday_breakTime"><label>Break (min)</label><input type="number" class="form-control" id="manual-break" value="0"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Workday</button>
-                </form>
-                <hr>
-                <h6>Refuel Entry</h6>
-                <form id="manual-refuel-form">
-                    <div class="form-row">
-                       <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="manual-refuel-date" required></div>
-                       <div class="form-group col-md-4" data-field="refuel_odometer"><label>Odometer</label><input type="number" class="form-control" id="manual-refuel-odo" required></div>
-                       <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-amount" required></div>
-                    </div>
-                     <div class="form-row">
-                       <div class="form-group col-md-4" data-field="refuel_fuelType"><label>Fuel Type</label><input type="text" class="form-control" id="manual-refuel-type"></div>
-                       <div class="form-group col-md-4" data-field="refuel_price"><label>Price (<span class="currency-symbol"></span>)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-price"></div>
-                       <div class="form-group col-md-4" data-field="refuel_paymentMethod"><label>Payment</label><input type="text" class="form-control" id="manual-refuel-payment"></div>
-                    </div>
-                     <div class="form-row">
-                        <div class="form-group col-md-4" data-field="refuel_location"><label>Location</label><input type="text" class="form-control" id="manual-refuel-location"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Refuel</button>
-                </form>
+                <div id="manual-workday-section">
+                    <h6>Workday Entry</h6>
+                    <form id="manual-work-form">
+                        <div class="form-row">
+                            <div class="form-group col-md-6" data-field="workday_startTime"><label>Start Time</label><input type="datetime-local" class="form-control" id="manual-start-time"></div>
+                            <div class="form-group col-md-6" data-field="workday_endTime"><label>End Time</label><input type="datetime-local" class="form-control" id="manual-end-time"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-6" data-field="workday_startLocation"><label>Start Location</label><input type="text" class="form-control" id="manual-start-location"></div>
+                            <div class="form-group col-md-6" data-field="workday_endLocation"><label>End Location</label><input type="text" class="form-control" id="manual-end-location"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-3" data-field="workday_carPlate"><label>Car Plate</label><input type="text" class="form-control" id="manual-car-plate"></div>
+                            <div class="form-group col-md-3" data-field="workday_startOdometer"><label>Start Odometer</label><input type="number" class="form-control" id="manual-start-odo"></div>
+                            <div class="form-group col-md-3" data-field="workday_endOdometer"><label>End Odometer</label><input type="number" class="form-control" id="manual-end-odo"></div>
+                            <div class="form-group col-md-3" data-field="workday_breakTime"><label>Break (min)</label><input type="number" class="form-control" id="manual-break" value="0"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Workday</button>
+                    </form>
+                </div>
+                <hr id="manual-separator">
+                <div id="manual-refuel-section">
+                    <h6>Refuel Entry</h6>
+                    <form id="manual-refuel-form">
+                        <div class="form-row">
+                           <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="manual-refuel-date" required></div>
+                           <div class="form-group col-md-4" data-field="refuel_odometer"><label>Odometer</label><input type="number" class="form-control" id="manual-refuel-odo" required></div>
+                           <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-amount" required></div>
+                        </div>
+                         <div class="form-row">
+                           <div class="form-group col-md-4" data-field="refuel_fuelType"><label>Fuel Type</label><input type="text" class="form-control" id="manual-refuel-type"></div>
+                           <div class="form-group col-md-4" data-field="refuel_price"><label>Price (<span class="currency-symbol"></span>)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-price"></div>
+                           <div class="form-group col-md-4" data-field="refuel_paymentMethod"><label>Payment</label><input type="text" class="form-control" id="manual-refuel-payment"></div>
+                        </div>
+                         <div class="form-row">
+                            <div class="form-group col-md-4" data-field="refuel_location"><label>Location</label><input type="text" class="form-control" id="manual-refuel-location"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Refuel</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -221,15 +232,32 @@
         }
         
         function applyFieldSettings() {
+            const { fields } = companySettings;
+            if (!fields) return;
+
+            // Show/hide all elements with data-field attribute
             document.querySelectorAll('[data-field]').forEach(el => {
                 const key = el.getAttribute('data-field');
-                let show = companySettings.fields ? companySettings.fields[key] !== false : true;
-                
+                let show = fields[key] !== false;
+
+                // Special handling for distance column, depends on two fields
                 if (key === 'workday_endOdometer' && (el.tagName === 'TH' || el.tagName === 'TD')) {
-                     show = companySettings.fields ? (companySettings.fields['workday_startOdometer'] && companySettings.fields['workday_endOdometer']) : true;
+                    show = fields['workday_startOdometer'] && fields['workday_endOdometer'];
                 }
                 el.style.display = show ? '' : 'none';
             });
+            
+            // Show/hide entire sections
+            const isAnyWorkdayFieldEnabled = Object.keys(fields).some(key => key.startsWith('workday_') && fields[key]);
+            document.getElementById('workday-section').style.display = isAnyWorkdayFieldEnabled ? '' : 'none';
+             document.getElementById('manual-workday-section').style.display = isAnyWorkdayFieldEnabled ? '' : 'none';
+
+            const isAnyRefuelFieldEnabled = Object.keys(fields).some(key => key.startsWith('refuel_') && fields[key]);
+            document.getElementById('refuel-section').style.display = isAnyRefuelFieldEnabled ? '' : 'none';
+            document.getElementById('manual-refuel-section').style.display = isAnyRefuelFieldEnabled ? '' : 'none';
+            
+            document.getElementById('manual-separator').style.display = isAnyWorkdayFieldEnabled && isAnyRefuelFieldEnabled ? '' : 'none';
+
             document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = companySettings.currency || 'Ft');
         }
 
@@ -268,7 +296,7 @@
 
         async function loadWorkdayEvents() {
             const tableBody = document.getElementById('workday-table-body');
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="12" class="text-center">Loading...</td></tr>';
             
             const params = new URLSearchParams();
             if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
@@ -285,7 +313,7 @@
                 if (!res.ok) throw new Error((await res.json()).error);
                 const events = await res.json();
                 tableBody.innerHTML = '';
-                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No data found.</td></tr>';
+                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="12" class="text-center">No data found.</td></tr>';
 
                 events.forEach(e => {
                     const start = new Date(e.startTime);
@@ -301,8 +329,12 @@
                         <tr>
                             <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
                             <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
-                            <td data-field="workday_startTime">${start.toLocaleString()} - ${e.startLocation || '-'} (${e.startOdometer || '-'} km)</td>
-                            <td data-field="workday_endTime">${end ? `${end.toLocaleString()} - ${e.endLocation || '-'} (${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
+                            <td data-field="workday_startTime">${start.toLocaleString()}</td>
+                            <td data-field="workday_startLocation">${e.startLocation || '-'}</td>
+                            <td data-field="workday_startOdometer">${e.startOdometer || '-'} km</td>
+                            <td data-field="workday_endTime">${end ? end.toLocaleString() : 'Ongoing'}</td>
+                            <td data-field="workday_endLocation">${e.endLocation || '-'}</td>
+                            <td data-field="workday_endOdometer">${e.endOdometer || '-'} km</td>
                             <td data-field="workday_breakTime">${e.breakTime || 0} min</td>
                             <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
                             <td data-field="workday_endOdometer">${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
@@ -310,7 +342,7 @@
                         </tr>
                     `;
                 });
-            } catch (e) { tableBody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">${e.message}</td></tr>`; }
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">${e.message}</td></tr>`; }
         }
 
         async function deleteWorkdayEvent(id) {
@@ -324,7 +356,7 @@
 
         async function loadRefuelEvents() {
             const tableBody = document.getElementById('refuel-table-body');
-            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Loading...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="11" class="text-center">Loading...</td></tr>';
             
             const params = new URLSearchParams();
              if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
@@ -341,7 +373,7 @@
                 if (!res.ok) throw new Error((await res.json()).error);
                 const events = await res.json();
                 tableBody.innerHTML = '';
-                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data found.</td></tr>';
+                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="11" class="text-center">No data found.</td></tr>';
                 
                 events.forEach(e => {
                     const actions = (currentUser.role === 'superadmin' || e.userId === currentUser.userId) ? 
@@ -367,7 +399,7 @@
                     `;
                 });
 
-            } catch (e) { tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">${e.message}</td></tr>`; }
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">${e.message}</td></tr>`; }
         }
 
         async function deleteRefuelEvent(id) {
