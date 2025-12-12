@@ -55,7 +55,7 @@
             <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th>
+                        <th data-role-display="admin,superadmin">User</th>
                         <th data-field="workday_carPlate">Plate</th>
                         <th data-field="workday_startTime">Start</th>
                         <th data-field="workday_endTime">End</th>
@@ -74,7 +74,7 @@
              <table class="table table-sm table-bordered">
                 <thead>
                     <tr>
-                        <th>User</th>
+                        <th data-role-display="admin,superadmin">User</th>
                         <th>Date</th>
                         <th data-field="refuel_location">Location</th>
                         <th data-field="refuel_odometer">Odometer</th>
@@ -150,7 +150,7 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        let currentUserRole = null;
+        let currentUser = null;
         let allUsers = [];
         let companySettings = {};
 
@@ -162,30 +162,19 @@
             const token = localStorage.getItem('token');
             if (!token) { window.location.href = '/login.html'; return; }
             
-            const decodedToken = parseJwt(token);
-            if (!decodedToken) { window.location.href = '/login.html'; return; }
-            currentUserRole = decodedToken.role;
+            currentUser = parseJwt(token);
+            if (!currentUser) { window.location.href = '/login.html'; return; }
+            
             document.getElementById('username-display').textContent = localStorage.getItem('username') || 'User';
 
             await loadCompanySettings();
+            setupRoleBasedUI();
 
-            if (currentUserRole === 'admin' || currentUserRole === 'superadmin') {
-                document.getElementById('user-filter-container').style.display = 'block';
-                document.getElementById('manual-entry-btn').style.display = 'inline-block';
-                const navLinks = document.getElementById('nav-links');
-                const adminLi = document.createElement('li');
-                adminLi.className = 'nav-item';
-                adminLi.innerHTML = `<a class="nav-link" href="/admin">Admin</a>`;
-                navLinks.appendChild(adminLi);
-                const settingsLi = document.createElement('li');
-                settingsLi.className = 'nav-item';
-                settingsLi.innerHTML = `<a class="nav-link" href="/settings">Settings</a>`;
-                navLinks.appendChild(settingsLi);
-                if(currentUserRole === 'superadmin') {
-                     document.getElementById('company-filter-container').style.display = 'block';
-                     await populateCompanyFilter();
-                } 
-                await populateUserFilter(decodedToken.companyId);
+            if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+                 await populateUserFilter();
+            }
+             if (currentUser.role === 'superadmin') {
+                await populateCompanyFilter();
             }
 
             document.getElementById('filter-btn').addEventListener('click', fetchData);
@@ -197,17 +186,34 @@
             document.getElementById('manual-work-form').addEventListener('submit', handleManualWorkdaySubmit);
             document.getElementById('manual-refuel-form').addEventListener('submit', handleManualRefuelSubmit);
 
-            await fetchData(); // Initial data load
+            await fetchData();
         });
+
+        function setupRoleBasedUI() {
+            if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+                document.getElementById('user-filter-container').style.display = 'block';
+                document.getElementById('manual-entry-btn').style.display = 'inline-block';
+                document.getElementById('manual-user-select-container').style.display = 'block';
+
+                const navLinks = document.getElementById('nav-links');
+                navLinks.innerHTML += '<li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>';
+                navLinks.innerHTML += '<li class="nav-item"><a class="nav-link" href="/settings">Settings</a></li>';
+            }
+
+            if (currentUser.role === 'superadmin') {
+                document.getElementById('company-filter-container').style.display = 'block';
+            }
+
+            document.querySelectorAll('[data-role-display]').forEach(el => {
+                const roles = el.getAttribute('data-role-display').split(',');
+                el.style.display = roles.includes(currentUser.role) ? '' : 'none';
+            });
+        }
 
         async function loadCompanySettings() {
              try {
                 const res = await fetch('/api/my-settings', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
-                if (res.ok) {
-                    companySettings = await res.json();
-                } else { // Fallback to default if fetch fails
-                    companySettings = { fields: {} };
-                }
+                companySettings = res.ok ? await res.json() : { fields: {} };
             } catch (e) {
                 console.error('Could not load company settings', e);
                 companySettings = { fields: {} };
@@ -217,26 +223,19 @@
         function applyFieldSettings() {
             document.querySelectorAll('[data-field]').forEach(el => {
                 const key = el.getAttribute('data-field');
-                let show = true; // Default to show if settings are not defined
+                let show = companySettings.fields ? companySettings.fields[key] !== false : true;
                 
-                // Special case for Distance column, depends on two fields
-                if (key === 'workday_endOdometer' && el.tagName === 'TH') {
-                    if (companySettings.fields) {
-                       show = companySettings.fields['workday_startOdometer'] && companySettings.fields['workday_endOdometer'];
-                    }
-                } else if (companySettings.fields && companySettings.fields[key] !== undefined) {
-                    show = companySettings.fields[key];
+                if (key === 'workday_endOdometer' && (el.tagName === 'TH' || el.tagName === 'TD')) {
+                     show = companySettings.fields ? (companySettings.fields['workday_startOdometer'] && companySettings.fields['workday_endOdometer']) : true;
                 }
-
                 el.style.display = show ? '' : 'none';
             });
-
             document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = companySettings.currency || 'Ft');
         }
 
         async function fetchData() {
             await Promise.all([loadWorkdayEvents(), loadRefuelEvents()]);
-            applyFieldSettings(); // Apply settings after data is fetched and rendered
+            applyFieldSettings();
         }
 
         async function populateCompanyFilter() {
@@ -249,7 +248,7 @@
             } catch(e) { console.error(e); }
         }
 
-        async function populateUserFilter(companyId) {
+        async function populateUserFilter() {
              try {
                 const res = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
                 allUsers = await res.json();
@@ -259,15 +258,11 @@
                 userFilter.innerHTML = '<option value="all">All Users</option>';
                 manualUserSelect.innerHTML = '';
 
-                let usersToList = companyId ? allUsers.filter(u => u.companyId === companyId) : allUsers;
-                usersToList.forEach(u => { 
+                allUsers.forEach(u => { 
                     const option = `<option value="${u.id}">${u.realName || u.username}</option>`;
                     userFilter.innerHTML += option;
                     manualUserSelect.innerHTML += option;
                 });
-                 if(currentUserRole === 'admin' || currentUserRole === 'superadmin') {
-                    document.getElementById('manual-user-select-container').style.display = 'block';
-                 }
             } catch(e) { console.error(e); }
         }
 
@@ -278,9 +273,11 @@
             const params = new URLSearchParams();
             if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
             if(document.getElementById('end-date').value) params.append('endDate', document.getElementById('end-date').value);
-            if(currentUserRole === 'admin' || currentUserRole === 'superadmin'){
+            if(currentUser.role === 'admin' || currentUser.role === 'superadmin'){
                 if(document.getElementById('user-filter')?.value !== 'all') params.append('userId', document.getElementById('user-filter').value);
-                if(currentUserRole === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') params.append('companyId', document.getElementById('company-filter').value);
+            }
+            if(currentUser.role === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') {
+                params.append('companyId', document.getElementById('company-filter').value);
             }
 
             try {
@@ -294,15 +291,15 @@
                     const start = new Date(e.startTime);
                     const end = e.endTime ? new Date(e.endTime) : null;
                     const netTime = end ? (end - start) - (e.breakTime * 60000) : 0;
-                    const actions = (currentUserRole === 'superadmin' || e.userId === parseJwt(localStorage.getItem('token')).userId) ? 
+                    const actions = (currentUser.role === 'superadmin' || e.userId === currentUser.userId) ? 
                         `<td>
                             <button class="btn btn-sm btn-info" onclick="window.location.href='/edit_workday.html?id=${e.id}'">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteWorkdayEvent(${e.id})">Delete</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteWorkdayEvent('${e.id}')">Delete</button>
                         </td>` : '<td></td>';
 
                     tableBody.innerHTML += `
                         <tr>
-                            <td>${e.User?.realName || e.User?.username}</td>
+                            <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
                             <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
                             <td data-field="workday_startTime">${start.toLocaleString()} - ${e.startLocation || '-'} (${e.startOdometer || '-'} km)</td>
                             <td data-field="workday_endTime">${end ? `${end.toLocaleString()} - ${e.endLocation || '-'} (${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
@@ -332,9 +329,11 @@
             const params = new URLSearchParams();
              if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
             if(document.getElementById('end-date').value) params.append('endDate', document.getElementById('end-date').value);
-            if(currentUserRole === 'admin' || currentUserRole === 'superadmin'){
+            if(currentUser.role === 'admin' || currentUser.role === 'superadmin'){
                 if(document.getElementById('user-filter')?.value !== 'all') params.append('userId', document.getElementById('user-filter').value);
-                if(currentUserRole === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') params.append('companyId', document.getElementById('company-filter').value);
+            }
+             if(currentUser.role === 'superadmin' && document.getElementById('company-filter')?.value !== 'all') {
+                params.append('companyId', document.getElementById('company-filter').value);
             }
 
             try {
@@ -345,15 +344,15 @@
                 if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data found.</td></tr>';
                 
                 events.forEach(e => {
-                    const actions = (currentUserRole === 'superadmin' || e.userId === parseJwt(localStorage.getItem('token')).userId) ? 
+                    const actions = (currentUser.role === 'superadmin' || e.userId === currentUser.userId) ? 
                         `<td>
                             <button class="btn btn-sm btn-info" onclick="window.location.href='/edit_refuel.html?id=${e.id}'">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteRefuelEvent(${e.id})">Delete</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteRefuelEvent('${e.id}')">Delete</button>
                         </td>` : '<td></td>';
 
                     tableBody.innerHTML += `
                         <tr>
-                            <td>${e.User?.realName || e.User?.username}</td>
+                            <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
                             <td>${new Date(e.timestamp).toLocaleString()}</td>
                             <td data-field="refuel_location">${e.location || '-'}</td>
                             <td data-field="refuel_odometer">${e.odometer} km</td>
@@ -382,8 +381,12 @@
         
         async function handleManualWorkdaySubmit(e) {
             e.preventDefault();
+            let userId = currentUser.userId;
+            if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+                userId = document.getElementById('manual-user-select').value;
+            }
             const body = {
-                userId: document.getElementById('manual-user-select').value,
+                userId,
                 startTime: document.getElementById('manual-start-time').value,
                 endTime: document.getElementById('manual-end-time').value || null,
                 startLocation: document.getElementById('manual-start-location').value,
@@ -408,8 +411,12 @@
 
         async function handleManualRefuelSubmit(e) {
             e.preventDefault();
+            let userId = currentUser.userId;
+            if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+                userId = document.getElementById('manual-user-select').value;
+            }
              const body = {
-                userId: document.getElementById('manual-user-select').value,
+                userId,
                 timestamp: document.getElementById('manual-refuel-date').value,
                 odometer: document.getElementById('manual-refuel-odo').value,
                 fuelType: document.getElementById('manual-refuel-type').value,

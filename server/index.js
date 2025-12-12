@@ -139,7 +139,6 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Ensure boolean values are correct from checkbox values
         if (newSettings.maintenance_mode !== undefined) {
             newSettings.maintenance_mode = newSettings.maintenance_mode === 'true' || newSettings.maintenance_mode === true;
         }
@@ -213,56 +212,182 @@ adminRouter.get('/companies', async (req, res) => {
 
 app.use('/api/admin', adminRouter);
 
-// Workday and Refuel events
+// --- Secure Event Routers ---
 const eventsRouter = express.Router();
 eventsRouter.use(authenticateToken);
 
+// --- Workday Events ---
 eventsRouter.get('/workday-events', async (req, res) => {
-    const { startDate, endDate, userId, companyId } = req.query;
-    const where = {};
-    if (startDate) where.startTime = { [Op.gte]: new Date(startDate) };
-    if (endDate) where.endTime = { [Op.lte]: new Date(endDate) };
-    if (userId) where.userId = userId;
-    if (companyId) {
-        const users = await db.User.findAll({ where: { companyId }, attributes: ['id'] });
-        where.userId = { [Op.in]: users.map(u => u.id) };
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const { startDate, endDate, userId: queryUserId, companyId: queryCompanyId } = req.query;
+
+        const where = {};
+        if (startDate) where.startTime = { [Op.gte]: new Date(startDate) };
+        if (endDate) where.endTime = { [Op.lte]: new Date(endDate) };
+
+        switch (role) {
+            case 'superadmin':
+                if (queryCompanyId && queryCompanyId !== 'all') {
+                    const users = await db.User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
+                    where.userId = { [Op.in]: users.map(u => u.id) };
+                }
+                if (queryUserId && queryUserId !== 'all') {
+                    where.userId = queryUserId;
+                }
+                break;
+            case 'admin':
+                const usersInCompany = await db.User.findAll({ where: { companyId: currentUserCompanyId }, attributes: ['id'] });
+                const userIdsInCompany = usersInCompany.map(u => u.id);
+                if (queryUserId && queryUserId !== 'all' && userIdsInCompany.includes(queryUserId)) {
+                    where.userId = queryUserId;
+                } else {
+                    where.userId = { [Op.in]: userIdsInCompany };
+                }
+                break;
+            default: // 'user' role
+                where.userId = currentUserId;
+                break;
+        }
+        const events = await db.WorkdayEvent.findAll({ where, include: [{ model: db.User, attributes: ['username', 'realName'] }], order: [['startTime', 'DESC']] });
+        res.json(events);
+    } catch (error) {
+        console.error('Error fetching workday events:', error);
+        res.status(500).json({ error: 'Failed to fetch workday events.' });
     }
-    const events = await db.WorkdayEvent.findAll({ where, include: [db.User] });
-    res.json(events);
 });
 
 eventsRouter.post('/workday-events', async (req, res) => {
-    const newEvent = await db.WorkdayEvent.create(req.body);
-    res.status(201).json(newEvent);
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const eventData = req.body;
+
+        if (role === 'user') {
+            eventData.userId = currentUserId;
+        } else if (role === 'admin') {
+            const targetUser = await db.User.findByPk(eventData.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden: You can only create events for users in your company.' });
+            }
+        }
+        
+        const newEvent = await db.WorkdayEvent.create(eventData);
+        res.status(201).json(newEvent);
+    } catch (error) {
+        console.error('Error creating workday event:', error);
+        res.status(500).json({ error: 'Failed to create workday event.' });
+    }
 });
 
 eventsRouter.delete('/workday-events/:id', async (req, res) => {
-    await db.WorkdayEvent.destroy({ where: { id: req.params.id } });
-    res.status(204).send();
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.WorkdayEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+
+        await event.destroy();
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error deleting workday event:', error);
+        res.status(500).json({ error: 'Failed to delete workday event.' });
+    }
 });
 
+// --- Refuel Events ---
 eventsRouter.get('/refuel-events', async (req, res) => {
-    const { startDate, endDate, userId, companyId } = req.query;
-    const where = {};
-    if (startDate) where.timestamp = { [Op.gte]: new Date(startDate) };
-    if (endDate) where.timestamp = { [Op.lte]: new Date(endDate) };
-    if (userId) where.userId = userId;
-    if (companyId) {
-        const users = await db.User.findAll({ where: { companyId }, attributes: ['id'] });
-        where.userId = { [Op.in]: users.map(u => u.id) };
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const { startDate, endDate, userId: queryUserId, companyId: queryCompanyId } = req.query;
+
+        const where = {};
+        if (startDate) where.timestamp = { [Op.gte]: new Date(startDate) };
+        if (endDate) where.timestamp = { [Op.lte]: new Date(endDate) };
+
+        switch (role) {
+            case 'superadmin':
+                if (queryCompanyId && queryCompanyId !== 'all') {
+                    const users = await db.User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
+                    where.userId = { [Op.in]: users.map(u => u.id) };
+                }
+                if (queryUserId && queryUserId !== 'all') {
+                    where.userId = queryUserId;
+                }
+                break;
+            case 'admin':
+                const usersInCompany = await db.User.findAll({ where: { companyId: currentUserCompanyId }, attributes: ['id'] });
+                const userIdsInCompany = usersInCompany.map(u => u.id);
+                if (queryUserId && queryUserId !== 'all' && userIdsInCompany.includes(queryUserId)) {
+                    where.userId = queryUserId;
+                } else {
+                    where.userId = { [Op.in]: userIdsInCompany };
+                }
+                break;
+            default: // 'user' role
+                where.userId = currentUserId;
+                break;
+        }
+        const events = await db.RefuelEvent.findAll({ where, include: [{ model: db.User, attributes: ['username', 'realName'] }], order: [['timestamp', 'DESC']] });
+        res.json(events);
+    } catch (error) {
+        console.error('Error fetching refuel events:', error);
+        res.status(500).json({ error: 'Failed to fetch refuel events.' });
     }
-    const events = await db.RefuelEvent.findAll({ where, include: [db.User] });
-    res.json(events);
 });
 
 eventsRouter.post('/refuel-events', async (req, res) => {
-    const newEvent = await db.RefuelEvent.create(req.body);
-    res.status(201).json(newEvent);
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const eventData = req.body;
+
+        if (role === 'user') {
+            eventData.userId = currentUserId;
+        } else if (role === 'admin') {
+            const targetUser = await db.User.findByPk(eventData.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden: You can only create events for users in your company.' });
+            }
+        }
+        
+        const newEvent = await db.RefuelEvent.create(eventData);
+        res.status(201).json(newEvent);
+    } catch (error) {
+        console.error('Error creating refuel event:', error);
+        res.status(500).json({ error: 'Failed to create refuel event.' });
+    }
 });
 
 eventsRouter.delete('/refuel-events/:id', async (req, res) => {
-    await db.RefuelEvent.destroy({ where: { id: req.params.id } });
-    res.status(204).send();
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.RefuelEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+
+        await event.destroy();
+        res.status(204).send();
+    } catch (error) {
+        console.error('Error deleting refuel event:', error);
+        res.status(500).json({ error: 'Failed to delete refuel event.' });
+    }
 });
 
 app.use('/api', eventsRouter);
