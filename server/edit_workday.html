@@ -2,130 +2,88 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Munkanap szerkesztése</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        .form-container { max-width: 500px; margin: auto; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input { width: 100%; padding: 8px; box-sizing: border-box; }
-        button { padding: 10px 15px; border-radius: 3px; border: none; color: white; cursor: pointer; }
-        .save-btn { background-color: #4CAF50; }
-        .cancel-btn { background-color: #aaa; }
-    </style>
+    <title>Edit Workday</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-    <div class="form-container">
-        <h1>Munkanap szerkesztése</h1>
+    <div class="container mt-5">
+        <h2>Edit Workday Event</h2>
         <form id="edit-workday-form">
-            <div class="form-group">
-                <label for="startTime">Munkaidő kezdete:</label>
-                <input type="datetime-local" id="startTime" name="startTime" required>
+            <div class="form-row">
+                <div class="form-group col-md-6"><label>Start Time</label><input type="datetime-local" class="form-control" id="start-time"></div>
+                <div class="form-group col-md-6"><label>End Time</label><input type="datetime-local" class="form-control" id="end-time"></div>
             </div>
-            <div class="form-group">
-                <label for="startLocation">Városa (kezdet):</label>
-                <input type="text" id="startLocation" name="startLocation">
+            <div class="form-row">
+                <div class="form-group col-md-6"><label>Start Location</label><input type="text" class="form-control" id="start-location"></div>
+                <div class="form-group col-md-6"><label>End Location</label><input type="text" class="form-control" id="end-location"></div>
             </div>
-            <div class="form-group">
-                <label for="endTime">Munkaidő vége:</label>
-                <input type="datetime-local" id="endTime" name="endTime">
+            <div class="form-row">
+                <div class="form-group col-md-3"><label>Car Plate</label><input type="text" class="form-control" id="car-plate"></div>
+                <div class="form-group col-md-3"><label>Start Odometer</label><input type="number" class="form-control" id="start-odo"></div>
+                <div class="form-group col-md-3"><label>End Odometer</label><input type="number" class="form-control" id="end-odo"></div>
+                <div class="form-group col-md-3"><label>Break (min)</label><input type="number" class="form-control" id="break-time"></div>
             </div>
-            <div class="form-group">
-                <label for="endLocation">Városa (vége):</label>
-                <input type="text" id="endLocation" name="endLocation">
-            </div>
-            <div class="form-group">
-                <label for="breakTime">Szünet (perc):</label>
-                <input type="number" id="breakTime" name="breakTime">
-            </div>
-            <div class="form-group">
-                <label for="startOdometer">Kezdő km állás:</label>
-                <input type="number" id="startOdometer" name="startOdometer">
-            </div>
-            <div class="form-group">
-                <label for="endOdometer">Záró km állás:</label>
-                <input type="number" id="endOdometer" name="endOdometer">
-            </div>
-            <div class="form-group">
-                <button type="submit" class="save-btn">Mentés</button>
-                <button type="button" class="cancel-btn" onclick="window.location.href='/'">Mégse</button>
-            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/dashboard" class="btn btn-secondary">Cancel</a>
         </form>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const form = document.getElementById('edit-workday-form');
-            const urlParams = new URLSearchParams(window.location.search);
-            const workdayId = urlParams.get('id');
             const token = localStorage.getItem('token');
+            if (!token) { window.location.href = '/login.html'; return; }
 
-            if (!workdayId) {
-                alert('Nincs munkanap azonosító megadva!');
-                window.location.href = '/';
-                return;
-            }
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('id');
+            if (!eventId) { alert('No event ID specified.'); window.location.href = '/dashboard'; return; }
 
-            // Fetch existing data
             try {
-                const response = await fetch(`/api/workday-events/${workdayId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!response.ok) throw new Error('A munkanap betöltése nem sikerült.');
-                const event = await response.json();
+                const res = await fetch(`/api/workday-events/${eventId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to load event data.');
+                
+                const event = await res.json();
+                // Format dates for datetime-local input
+                const formatForInput = (date) => new Date(date).toISOString().slice(0, 16);
 
-                // Populate form
-                document.getElementById('startTime').value = toLocalISOString(new Date(event.startTime));
-                document.getElementById('startLocation').value = event.startLocation || '';
-                document.getElementById('endTime').value = event.endTime ? toLocalISOString(new Date(event.endTime)) : '';
-                document.getElementById('endLocation').value = event.endLocation || '';
-                document.getElementById('breakTime').value = event.breakTime || 0;
-                document.getElementById('startOdometer').value = event.startOdometer || '';
-                document.getElementById('endOdometer').value = event.endOdometer || '';
+                document.getElementById('start-time').value = formatForInput(event.startTime);
+                if (event.endTime) document.getElementById('end-time').value = formatForInput(event.endTime);
+                document.getElementById('start-location').value = event.startLocation || '';
+                document.getElementById('end-location').value = event.endLocation || '';
+                document.getElementById('car-plate').value = event.carPlate || '';
+                document.getElementById('start-odo').value = event.startOdometer || '';
+                document.getElementById('end-odo').value = event.endOdometer || '';
+                document.getElementById('break-time').value = event.breakTime || 0;
+
             } catch (error) {
                 alert(error.message);
-                console.error('Hiba a betöltéskor:', error);
+                window.location.href = '/dashboard';
             }
 
-            // Handle form submission
-            form.addEventListener('submit', async (e) => {
+            document.getElementById('edit-workday-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const formData = {
-                    startTime: document.getElementById('startTime').value,
-                    startLocation: document.getElementById('startLocation').value,
-                    endTime: document.getElementById('endTime').value || null,
-                    endLocation: document.getElementById('endLocation').value,
-                    breakTime: parseInt(document.getElementById('breakTime').value, 10),
-                    startOdometer: parseInt(document.getElementById('startOdometer').value, 10),
-                    endOdometer: parseInt(document.getElementById('endOdometer').value, 10),
+                const updatedEvent = {
+                    startTime: document.getElementById('start-time').value,
+                    endTime: document.getElementById('end-time').value || null,
+                    startLocation: document.getElementById('start-location').value,
+                    endLocation: document.getElementById('end-location').value,
+                    carPlate: document.getElementById('car-plate').value,
+                    startOdometer: document.getElementById('start-odo').value,
+                    endOdometer: document.getElementById('end-odo').value,
+                    breakTime: document.getElementById('break-time').value
                 };
 
                 try {
-                    const response = await fetch(`/api/workday-events/${workdayId}`, {
+                    const res = await fetch(`/api/workday-events/${eventId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify(formData)
+                        body: JSON.stringify(updatedEvent)
                     });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || 'A mentés nem sikerült.');
-                    }
-                    
-                    alert('Sikeres mentés!');
-                    window.location.href = '/'; // Redirect back to the main page
-
+                    if (!res.ok) throw new Error('Failed to save changes.');
+                    window.location.href = '/dashboard';
                 } catch (error) {
                     alert(error.message);
-                    console.error('Hiba a mentéskor:', error);
                 }
             });
-
-            // Helper to format date for datetime-local input
-            function toLocalISOString(date) {
-                const d = new Date(date);
-                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-                return d.toISOString().slice(0, 16);
-            }
         });
     </script>
 </body>

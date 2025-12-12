@@ -2,110 +2,87 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tankolás szerkesztése</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        h1 { color: #333; }
-        form { display: flex; flex-direction: column; max-width: 500px; }
-        label { margin-top: 10px; }
-        input, select { padding: 8px; margin-top: 5px; }
-        button { margin-top: 20px; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        button:hover { background-color: #45a049; }
-        #message { margin-top: 15px; }
-    </style>
+    <title>Edit Refuel</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-    <h1>Tankolás szerkesztése</h1>
-    <form id="edit-refuel-form">
-        <label for="timestamp">Időpont</label>
-        <input type="datetime-local" id="timestamp" name="timestamp">
-
-        <label for="odometer">KM állás</label>
-        <input type="number" id="odometer" name="odometer">
-
-        <label for="fuelType">Üzemanyag</label>
-        <input type="text" id="fuelType" name="fuelType">
-
-        <label for="fuelAmount">Mennyiség (liter)</label>
-        <input type="number" step="0.01" id="fuelAmount" name="fuelAmount">
-
-        <label for="value">Érték (currency)</label>
-        <input type="number" step="0.01" id="value" name="value">
-
-        <label for="paymentMethod">Fizetési mód</label>
-        <input type="text" id="paymentMethod" name="paymentMethod">
-
-        <label for="carPlate">Rendszám</label>
-        <input type="text" id="carPlate" name="carPlate">
-
-        <button type="submit">Mentés</button>
-    </form>
-    <div id="message"></div>
-    <a href="/">Vissza a főoldalra</a>
+    <div class="container mt-5">
+        <h2>Edit Refuel Event</h2>
+        <form id="edit-refuel-form">
+            <div class="form-row">
+               <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="refuel-date" required></div>
+               <div class="form-group col-md-4"><label>Odometer</label><input type="number" class="form-control" id="refuel-odo" required></div>
+               <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="refuel-amount" required></div>
+            </div>
+             <div class="form-row">
+               <div class="form-group col-md-4"><label>Fuel Type</label><input type="text" class="form-control" id="refuel-type"></div>
+               <div class="form-group col-md-4"><label>Price</label><input type="number" step="0.01" class="form-control" id="refuel-price"></div>
+               <div class="form-group col-md-4"><label>Payment</label><input type="text" class="form-control" id="refuel-payment"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6"><label>Location</label><input type="text" class="form-control" id="refuel-location"></div>
+                <div class="form-group col-md-6"><label>Car Plate</label><input type="text" class="form-control" id="car-plate"></div>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const id = urlParams.get('id');
-            const form = document.getElementById('edit-refuel-form');
-            const messageDiv = document.getElementById('message');
             const token = localStorage.getItem('token');
+            if (!token) { window.location.href = '/login.html'; return; }
 
-            if (!id) {
-                messageDiv.innerHTML = '<p style="color: red;">Nincs ID megadva.</p>';
-                return;
-            }
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('id');
+            if (!eventId) { alert('No event ID specified.'); window.location.href = '/dashboard'; return; }
 
-            // Fetch existing data
             try {
-                const response = await fetch(`/api/refuel-events/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
-                if (!response.ok) throw new Error('Nem sikerült betölteni az adatokat.');
-                const event = await response.json();
+                const res = await fetch(`/api/refuel-events/${eventId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to load event data.');
+                
+                const event = await res.json();
+                const formatForInput = (date) => new Date(date).toISOString().slice(0, 16);
 
-                // Populate form
-                document.getElementById('timestamp').value = toLocalISOString(new Date(event.timestamp));
-                document.getElementById('odometer').value = event.odometer;
-                document.getElementById('fuelType').value = event.fuelType;
-                document.getElementById('fuelAmount').value = event.fuelAmount;
-                document.getElementById('value').value = event.value;
-                document.getElementById('paymentMethod').value = event.paymentMethod;
-                document.getElementById('carPlate').value = event.carPlate;
+                document.getElementById('refuel-date').value = formatForInput(event.timestamp);
+                document.getElementById('refuel-odo').value = event.odometer;
+                document.getElementById('refuel-amount').value = event.fuelAmount;
+                document.getElementById('refuel-type').value = event.fuelType || '';
+                document.getElementById('refuel-price').value = event.value || '';
+                document.getElementById('refuel-payment').value = event.paymentMethod || '';
+                document.getElementById('refuel-location').value = event.location || '';
+                 document.getElementById('car-plate').value = event.carPlate || '';
 
             } catch (error) {
-                messageDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+                alert(error.message);
+                window.location.href = '/dashboard';
             }
 
-            // Handle form submission
-            form.addEventListener('submit', async (e) => {
+            document.getElementById('edit-refuel-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const formData = new FormData(form);
-                const data = Object.fromEntries(formData.entries());
-                
-                // Convert to correct types
-                data.odometer = parseInt(data.odometer, 10);
-                data.fuelAmount = parseFloat(data.fuelAmount);
-                data.value = parseFloat(data.value);
+                const updatedEvent = {
+                    timestamp: document.getElementById('refuel-date').value,
+                    odometer: document.getElementById('refuel-odo').value,
+                    fuelAmount: document.getElementById('refuel-amount').value,
+                    fuelType: document.getElementById('refuel-type').value,
+                    value: document.getElementById('refuel-price').value,
+                    paymentMethod: document.getElementById('refuel-payment').value,
+                    location: document.getElementById('refuel-location').value,
+                    carPlate: document.getElementById('car-plate').value
+                };
 
                 try {
-                    const response = await fetch(`/api/refuel-events/${id}`, {
+                    const res = await fetch(`/api/refuel-events/${eventId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify(data)
+                        body: JSON.stringify(updatedEvent)
                     });
-                    if (!response.ok) throw new Error('A mentés nem sikerült.');
-                    messageDiv.innerHTML = '<p style="color: green;">Sikeresen mentve!</p>';
-                    setTimeout(() => window.location.href = '/', 1000);
+                    if (!res.ok) throw new Error('Failed to save changes.');
+                    window.location.href = '/dashboard';
                 } catch (error) {
-                    messageDiv.innerHTML = `<p style="color: red;">${error.message}</p>`;
+                    alert(error.message);
                 }
             });
-            
-            function toLocalISOString(date) {
-                const d = new Date(date);
-                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-                return d.toISOString().slice(0, 16);
-            }
         });
     </script>
 </body>

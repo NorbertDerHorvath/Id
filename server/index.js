@@ -257,6 +257,51 @@ eventsRouter.get('/workday-events', async (req, res) => {
     }
 });
 
+eventsRouter.get('/workday-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.WorkdayEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+        res.json(event);
+    } catch (error) {
+        console.error('Error fetching single workday event:', error);
+        res.status(500).json({ error: 'Failed to fetch event.' });
+    }
+});
+
+eventsRouter.put('/workday-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.WorkdayEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+        await event.update(req.body);
+        res.json(event);
+    } catch (error) {
+        console.error('Error updating workday event:', error);
+        res.status(500).json({ error: 'Failed to update event.' });
+    }
+});
+
 eventsRouter.post('/workday-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
@@ -341,6 +386,51 @@ eventsRouter.get('/refuel-events', async (req, res) => {
     } catch (error) {
         console.error('Error fetching refuel events:', error);
         res.status(500).json({ error: 'Failed to fetch refuel events.' });
+    }
+});
+
+eventsRouter.get('/refuel-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.RefuelEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+        res.json(event);
+    } catch (error) {
+        console.error('Error fetching single refuel event:', error);
+        res.status(500).json({ error: 'Failed to fetch event.' });
+    }
+});
+
+eventsRouter.put('/refuel-events/:id', authenticateToken, async (req, res) => {
+    try {
+        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
+        const event = await db.RefuelEvent.findByPk(req.params.id);
+        if (!event) return res.status(404).json({ error: 'Event not found.' });
+
+        if (role === 'user' && event.userId !== currentUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (role === 'admin') {
+            const targetUser = await db.User.findByPk(event.userId);
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+        }
+        await event.update(req.body);
+        res.json(event);
+    } catch (error) {
+        console.error('Error updating refuel event:', error);
+        res.status(500).json({ error: 'Failed to update event.' });
     }
 });
 
