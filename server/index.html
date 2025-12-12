@@ -53,22 +53,7 @@
             <h4>Workday Events</h4>
             <div class="table-responsive">
                 <table class="table table-sm table-bordered">
-                    <thead>
-                        <tr>
-                            <th data-role-display="admin,superadmin">User</th>
-                            <th data-field="workday_carPlate">Rendszám</th>
-                            <th data-field="workday_startTime">Indulás ideje</th>
-                            <th data-field="workday_startLocation">Indulás helye</th>
-                            <th data-field="workday_startOdometer">Induló km</th>
-                            <th data-field="workday_endTime">Érkezés ideje</th>
-                            <th data-field="workday_endLocation">Érkezés helye</th>
-                            <th data-field="workday_endOdometer">Érkező km</th>
-                            <th data-field="workday_breakTime">Szünet</th>
-                            <th>Nettó idő</th>
-                            <th data-field="workday_endOdometer">Táv</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
+                    <thead id="workday-table-head"></thead>
                     <tbody id="workday-table-body"></tbody>
                 </table>
             </div>
@@ -133,6 +118,27 @@
                         <button type="submit" class="btn btn-primary">Save Workday</button>
                     </form>
                 </div>
+                <hr>
+                 <div id="manual-absence-section">
+                    <h6>Távollét / Ünnepnap</h6>
+                    <form id="manual-absence-form">
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="absence-date">Dátum</label>
+                                <input type="date" id="absence-date" class="form-control">
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="absence-type">Típus</label>
+                                <select id="absence-type" class="form-control">
+                                    <option value="vacation">Szabadság</option>
+                                    <option value="sick_leave">Betegállomány</option>
+                                    <option value="paid_holiday">Fizetett ünnep</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Absence</button>
+                    </form>
+                </div>
                 <hr id="manual-separator">
                 <div id="manual-refuel-section">
                     <h6>Refuel Entry</h6>
@@ -165,6 +171,13 @@
         let allUsers = [];
         let companySettings = {};
 
+        const eventTypeLabels = {
+            workday: 'Munkanap',
+            vacation: 'Szabadság',
+            sick_leave: 'Betegállomány',
+            paid_holiday: 'Fizetett ünnep'
+        };
+
         function parseJwt(token) {
             try { return JSON.parse(atob(token.split('.')[1])); } catch (e) { return null; }
         }
@@ -196,6 +209,7 @@
 
             document.getElementById('manual-work-form').addEventListener('submit', handleManualWorkdaySubmit);
             document.getElementById('manual-refuel-form').addEventListener('submit', handleManualRefuelSubmit);
+            document.getElementById('manual-absence-form').addEventListener('submit', handleManualAbsenceSubmit);
 
             await fetchData();
         });
@@ -235,19 +249,15 @@
             const { fields } = companySettings;
             if (!fields) return;
 
-            // Show/hide all elements with data-field attribute
             document.querySelectorAll('[data-field]').forEach(el => {
                 const key = el.getAttribute('data-field');
                 let show = fields[key] !== false;
-
-                // Special handling for distance column, depends on two fields
                 if (key === 'workday_endOdometer' && (el.tagName === 'TH' || el.tagName === 'TD')) {
                     show = fields['workday_startOdometer'] && fields['workday_endOdometer'];
                 }
                 el.style.display = show ? '' : 'none';
             });
             
-            // Show/hide entire sections
             const isAnyWorkdayFieldEnabled = Object.keys(fields).some(key => key.startsWith('workday_') && fields[key]);
             document.getElementById('workday-section').style.display = isAnyWorkdayFieldEnabled ? '' : 'none';
              document.getElementById('manual-workday-section').style.display = isAnyWorkdayFieldEnabled ? '' : 'none';
@@ -295,8 +305,21 @@
         }
 
         async function loadWorkdayEvents() {
+            const tableHead = document.getElementById('workday-table-head');
             const tableBody = document.getElementById('workday-table-body');
-            tableBody.innerHTML = '<tr><td colspan="12" class="text-center">Loading...</td></tr>';
+            tableHead.innerHTML = `<tr>
+                <th data-role-display="admin,superadmin">User</th>
+                <th>Típus</th>
+                <th>Dátum</th>
+                <th data-field="workday_carPlate">Rendszám</th>
+                <th data-field="workday_startTime">Indulás</th>
+                <th data-field="workday_endTime">Érkezés</th>
+                <th data-field="workday_breakTime">Szünet</th>
+                <th>Nettó idő</th>
+                <th data-field="workday_endOdometer">Táv</th>
+                <th>Actions</th>
+            </tr>`;
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Loading...</td></tr>';
             
             const params = new URLSearchParams();
             if(document.getElementById('start-date').value) params.append('startDate', document.getElementById('start-date').value);
@@ -313,36 +336,49 @@
                 if (!res.ok) throw new Error((await res.json()).error);
                 const events = await res.json();
                 tableBody.innerHTML = '';
-                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="12" class="text-center">No data found.</td></tr>';
+                if(events.length === 0) tableBody.innerHTML = '<tr><td colspan="10" class="text-center">No data found.</td></tr>';
 
                 events.forEach(e => {
-                    const start = new Date(e.startTime);
-                    const end = e.endTime ? new Date(e.endTime) : null;
-                    const netTime = end ? (end - start) - (e.breakTime * 60000) : 0;
+                    let rowHtml = '';
                     const actions = (currentUser.role === 'superadmin' || e.userId === currentUser.userId) ? 
                         `<td>
                             <button class="btn btn-sm btn-info" onclick="window.location.href='/edit_workday.html?id=${e.id}'">Edit</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteWorkdayEvent('${e.id}')">Delete</button>
                         </td>` : '<td></td>';
 
-                    tableBody.innerHTML += `
-                        <tr>
-                            <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
-                            <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
-                            <td data-field="workday_startTime">${start.toLocaleString()}</td>
-                            <td data-field="workday_startLocation">${e.startLocation || '-'}</td>
-                            <td data-field="workday_startOdometer">${e.startOdometer || '-'} km</td>
-                            <td data-field="workday_endTime">${end ? end.toLocaleString() : 'Ongoing'}</td>
-                            <td data-field="workday_endLocation">${e.endLocation || '-'}</td>
-                            <td data-field="workday_endOdometer">${e.endOdometer || '-'} km</td>
-                            <td data-field="workday_breakTime">${e.breakTime || 0} min</td>
-                            <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
-                            <td data-field="workday_endOdometer">${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
-                            ${actions}
-                        </tr>
-                    `;
+                    if (e.eventType === 'workday') {
+                        const start = new Date(e.startTime);
+                        const end = e.endTime ? new Date(e.endTime) : null;
+                        const netTime = end ? (end - start) - (e.breakTime * 60000) : 0;
+                        rowHtml = `
+                            <tr>
+                                <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
+                                <td>${eventTypeLabels[e.eventType]}</td>
+                                <td>${start.toLocaleDateString()}</td>
+                                <td data-field="workday_carPlate">${e.carPlate || '-'}</td>
+                                <td data-field="workday_startTime">${start.toLocaleTimeString()} (${e.startLocation || '-'} / ${e.startOdometer || '-'} km)</td>
+                                <td data-field="workday_endTime">${end ? `${end.toLocaleTimeString()} (${e.endLocation || '-'} / ${e.endOdometer || '-'} km)` : 'Ongoing'}</td>
+                                <td data-field="workday_breakTime">${e.breakTime || 0} min</td>
+                                <td>${new Date(netTime).toISOString().substr(11, 8)}</td>
+                                <td data-field="workday_endOdometer">${e.startOdometer && e.endOdometer ? e.endOdometer - e.startOdometer : '-'} km</td>
+                                ${actions}
+                            </tr>
+                        `;
+                    } else {
+                         rowHtml = `
+                            <tr>
+                                <td data-role-display="admin,superadmin">${e.User?.realName || e.User?.username}</td>
+                                <td>${eventTypeLabels[e.eventType]}</td>
+                                <td>${new Date(e.startTime).toLocaleDateString()}</td>
+                                <td colspan="6" class="text-center font-italic">-</td>
+                                ${actions}
+                            </tr>
+                        `;
+                    }
+                    tableBody.innerHTML += rowHtml;
                 });
-            } catch (e) { tableBody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">${e.message}</td></tr>`; }
+                applyFieldSettings(); // Re-apply to hide/show columns
+            } catch (e) { tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-danger">${e.message}</td></tr>`; }
         }
 
         async function deleteWorkdayEvent(id) {
@@ -422,6 +458,8 @@
 
             const body = {
                 userId,
+                companyId: currentUser.companyId, // Make sure to include companyId
+                eventType: 'workday',
                 startTime: getVal('manual-start-time') || null,
                 endTime: getVal('manual-end-time') || null,
                 startLocation: getVal('manual-start-location'),
@@ -444,6 +482,32 @@
                 fetchData();
             } catch(e) { alert('Error: ' + e.message); }
         }
+        
+        async function handleManualAbsenceSubmit(e) {
+            e.preventDefault();
+             let userId = currentUser.userId;
+            if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
+                userId = document.getElementById('manual-user-select').value;
+            }
+             const body = {
+                userId,
+                companyId: currentUser.companyId, // Make sure to include companyId
+                eventType: document.getElementById('absence-type').value,
+                startTime: document.getElementById('absence-date').value
+            };
+             try {
+                const res = await fetch('/api/workday-events', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                    body: JSON.stringify(body)
+                });
+                if(!res.ok) throw new Error((await res.json()).error);
+                $('#manualEntryModal').modal('hide');
+                 document.getElementById('manual-absence-form').reset();
+                fetchData();
+            } catch(e) { alert('Error: ' + e.message); }
+
+        }
 
         async function handleManualRefuelSubmit(e) {
             e.preventDefault();
@@ -456,6 +520,7 @@
 
              const body = {
                 userId,
+                companyId: currentUser.companyId, // Make sure to include companyId
                 timestamp: getVal('manual-refuel-date') || null,
                 odometer: getNumVal('manual-refuel-odo'),
                 fuelType: getVal('manual-refuel-type'),

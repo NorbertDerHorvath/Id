@@ -305,7 +305,7 @@ eventsRouter.put('/workday-events/:id', authenticateToken, async (req, res) => {
 eventsRouter.post('/workday-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const eventData = req.body;
+        let eventData = req.body;
 
         if (role === 'user') {
             eventData.userId = currentUserId;
@@ -315,7 +315,20 @@ eventsRouter.post('/workday-events', async (req, res) => {
                 return res.status(403).json({ error: 'Forbidden: You can only create events for users in your company.' });
             }
         }
-        
+
+        // Handle non-workday event types
+        if (['vacation', 'sick_leave', 'paid_holiday'].includes(eventData.eventType)) {
+            const date = new Date(eventData.startTime); // Expecting just a date string from the client
+            eventData = {
+                userId: eventData.userId,
+                companyId: eventData.companyId,
+                eventType: eventData.eventType,
+                startTime: new Date(date.setHours(0, 0, 0, 0)),
+                endTime: new Date(date.setHours(23, 59, 59, 999)),
+                comment: eventData.comment || null
+            };
+        }
+
         const newEvent = await db.WorkdayEvent.create(eventData);
         res.status(201).json(newEvent);
     } catch (error) {
