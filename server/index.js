@@ -37,9 +37,8 @@ const defaultSettings = {
     }
 };
 
-// Deep merge function for settings
 const mergeSettings = (savedSettings) => {
-    const finalSettings = JSON.parse(JSON.stringify(defaultSettings)); // Deep copy
+    const finalSettings = JSON.parse(JSON.stringify(defaultSettings));
     if (!savedSettings) return finalSettings;
 
     finalSettings.maintenance_mode = savedSettings.maintenance_mode !== undefined ? savedSettings.maintenance_mode : finalSettings.maintenance_mode;
@@ -98,7 +97,6 @@ app.get('/api/my-settings', authenticateToken, async (req, res) => {
 });
 
 app.get('/api/settings', authenticateToken, async (req, res) => {
-    console.log(`GET /api/settings request received for user: ${req.user.userId}`);
     const { role, companyId } = req.user;
     let targetCompanyId = companyId;
 
@@ -106,7 +104,7 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
         if (req.query.companyId) {
             targetCompanyId = req.query.companyId;
         } else {
-            return res.json(defaultSettings); // For superadmin, if no company is selected, send defaults
+            return res.json(defaultSettings);
         }
     } else if (role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden' });
@@ -115,7 +113,6 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
     try {
         const settings = await db.Settings.findOne({ where: { companyId: targetCompanyId } });
         const finalSettings = mergeSettings(settings ? settings.settings : {});
-        console.log('Settings fetched from DB for company:', targetCompanyId, finalSettings);
         res.json(finalSettings);
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -124,15 +121,12 @@ app.get('/api/settings', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/settings', authenticateToken, async (req, res) => {
-    console.log(`POST /api/settings request received for user: ${req.user.userId}`);
     const { role, companyId } = req.user;
     const { newSettings, targetCompanyId: reqCompanyId } = req.body;
-
     let targetCompanyId = companyId;
+
     if (role === 'superadmin') {
-        if (!reqCompanyId) {
-            return res.status(400).json({ error: 'Company ID is required for superadmin.' });
-        }
+        if (!reqCompanyId) return res.status(400).json({ error: 'Company ID is required for superadmin.' });
         targetCompanyId = reqCompanyId;
     } else if (role !== 'admin') {
         return res.status(403).json({ error: 'Forbidden' });
@@ -161,7 +155,6 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
             const finalSettings = mergeSettings(newSettings);
             settings = await db.Settings.create({ companyId: targetCompanyId, settings: finalSettings });
         }
-        console.log('Settings saved to DB for company:', targetCompanyId, settings.settings);
         res.status(200).json({ message: 'Settings saved', settings: settings.settings });
     } catch (error) {
         console.error('Error saving settings:', error);
@@ -171,16 +164,11 @@ app.post('/api/settings', authenticateToken, async (req, res) => {
 
 const adminRouter = express.Router();
 adminRouter.use(authenticateToken, (req, res, next) => {
-    console.log(`Admin route requested by user: ${req.user.userId}`);
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
-        console.log(`Forbidden admin route access for user: ${req.user.userId}`);
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
     next();
 });
 
 adminRouter.get('/users', async (req, res) => {
-    console.log('GET /api/admin/users request received');
     const { companyId, role } = req.user;
     try {
         const queryOptions = { attributes: { exclude: ['password'] }, include: [{ model: db.Company, attributes: ['name'] }], order: [['username', 'ASC']] };
@@ -188,7 +176,6 @@ adminRouter.get('/users', async (req, res) => {
             queryOptions.where = { companyId: companyId, role: {[Op.ne]: 'superadmin'} };
         }
         const users = await db.User.findAll(queryOptions);
-        console.log(`Found ${users.length} users`);
         res.json(users);
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -197,10 +184,7 @@ adminRouter.get('/users', async (req, res) => {
 });
 
 adminRouter.get('/companies', async (req, res) => {
-    console.log('GET /api/admin/companies request received');
-    if (req.user.role !== 'superadmin') {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
+    if (req.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
     try {
         const companies = await db.Company.findAll({ order: [['name', 'ASC']] });
         res.json(companies);
@@ -221,10 +205,18 @@ eventsRouter.get('/workday-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
         const { startDate, endDate, userId: queryUserId, companyId: queryCompanyId } = req.query;
-
         const where = {};
-        if (startDate) where.startTime = { [Op.gte]: new Date(startDate) };
-        if (endDate) where.endTime = { [Op.lte]: new Date(endDate) };
+
+        if (startDate) {
+            const filterStart = new Date(startDate);
+            filterStart.setHours(0, 0, 0, 0);
+            where[Op.or] = [ { endTime: { [Op.gte]: filterStart } }, { endTime: null } ];
+        }
+        if (endDate) {
+            const filterEnd = new Date(endDate);
+            filterEnd.setHours(23, 59, 59, 999);
+            where.startTime = { [Op.lte]: filterEnd };
+        }
 
         switch (role) {
             case 'superadmin':
@@ -232,22 +224,17 @@ eventsRouter.get('/workday-events', async (req, res) => {
                     const users = await db.User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
                     where.userId = { [Op.in]: users.map(u => u.id) };
                 }
-                if (queryUserId && queryUserId !== 'all') {
-                    where.userId = queryUserId;
-                }
+                if (queryUserId && queryUserId !== 'all') where.userId = queryUserId;
                 break;
             case 'admin':
                 const usersInCompany = await db.User.findAll({ where: { companyId: currentUserCompanyId }, attributes: ['id'] });
                 const userIdsInCompany = usersInCompany.map(u => u.id);
+                where.userId = { [Op.in]: userIdsInCompany };
                 if (queryUserId && queryUserId !== 'all' && userIdsInCompany.includes(queryUserId)) {
                     where.userId = queryUserId;
-                } else {
-                    where.userId = { [Op.in]: userIdsInCompany };
                 }
                 break;
-            default: // 'user' role
-                where.userId = currentUserId;
-                break;
+            default: where.userId = currentUserId; break;
         }
         const events = await db.WorkdayEvent.findAll({ where, include: [{ model: db.User, attributes: ['username', 'realName'] }], order: [['startTime', 'DESC']] });
         res.json(events);
@@ -257,107 +244,49 @@ eventsRouter.get('/workday-events', async (req, res) => {
     }
 });
 
-eventsRouter.get('/workday-events/:id', authenticateToken, async (req, res) => {
-    try {
-        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.WorkdayEvent.findByPk(req.params.id);
-        if (!event) return res.status(404).json({ error: 'Event not found.' });
-
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        if (role === 'admin') {
-            const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        }
-        res.json(event);
-    } catch (error) {
-        console.error('Error fetching single workday event:', error);
-        res.status(500).json({ error: 'Failed to fetch event.' });
-    }
-});
-
-eventsRouter.put('/workday-events/:id', authenticateToken, async (req, res) => {
-    try {
-        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.WorkdayEvent.findByPk(req.params.id);
-        if (!event) return res.status(404).json({ error: 'Event not found.' });
-
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        if (role === 'admin') {
-            const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        }
-        await event.update(req.body);
-        res.json(event);
-    } catch (error) {
-        console.error('Error updating workday event:', error);
-        res.status(500).json({ error: 'Failed to update event.' });
-    }
-});
-
 eventsRouter.post('/workday-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
         let eventData = req.body;
 
+        let targetCompanyId = currentUserCompanyId;
         if (role === 'user') {
             eventData.userId = currentUserId;
-        } else if (role === 'admin') {
+        } else if (role === 'admin' || role === 'superadmin') {
+            if (!eventData.userId) return res.status(400).json({ error: 'User selection is required.' });
             const targetUser = await db.User.findByPk(eventData.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+            if (!targetUser) return res.status(404).json({ error: 'Target user not found.' });
+            if (role === 'admin' && targetUser.companyId !== currentUserCompanyId) {
                 return res.status(403).json({ error: 'Forbidden: You can only create events for users in your company.' });
             }
+            targetCompanyId = targetUser.companyId;
         }
+        eventData.companyId = targetCompanyId;
 
-        // Handle non-workday event types
-        if (['vacation', 'sick_leave', 'paid_holiday'].includes(eventData.eventType)) {
-            const date = new Date(eventData.startTime); // Expecting just a date string from the client
+        const { eventType, startTime } = eventData;
+
+        if (['vacation', 'sick_leave', 'paid_holiday'].includes(eventType)) {
+            if (!startTime) return res.status(400).json({ error: 'Date is required for absence/holiday events.' });
+            const date = new Date(startTime);
+            if (isNaN(date.getTime())) return res.status(400).json({ error: 'Invalid date provided.' });
+            
             eventData = {
-                userId: eventData.userId,
-                companyId: eventData.companyId,
-                eventType: eventData.eventType,
+                userId: eventData.userId, companyId: eventData.companyId, eventType: eventType,
                 startTime: new Date(date.setHours(0, 0, 0, 0)),
                 endTime: new Date(date.setHours(23, 59, 59, 999)),
                 comment: eventData.comment || null
             };
+        } else { 
+            if (!startTime) return res.status(400).json({ error: 'Start time is required for workday events.' });
+            eventData.eventType = 'workday';
         }
 
         const newEvent = await db.WorkdayEvent.create(eventData);
         res.status(201).json(newEvent);
     } catch (error) {
+        if (error.name === 'SequelizeValidationError') return res.status(400).json({ error: error.errors.map(e => e.message).join(', ') });
         console.error('Error creating workday event:', error);
         res.status(500).json({ error: 'Failed to create workday event.' });
-    }
-});
-
-eventsRouter.delete('/workday-events/:id', async (req, res) => {
-    try {
-        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.WorkdayEvent.findByPk(req.params.id);
-        if (!event) return res.status(404).json({ error: 'Event not found.' });
-
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        if (role === 'admin') {
-            const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        }
-
-        await event.destroy();
-        res.status(204).send();
-    } catch (error) {
-        console.error('Error deleting workday event:', error);
-        res.status(500).json({ error: 'Failed to delete workday event.' });
     }
 });
 
@@ -366,33 +295,34 @@ eventsRouter.get('/refuel-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
         const { startDate, endDate, userId: queryUserId, companyId: queryCompanyId } = req.query;
-
         const where = {};
-        if (startDate) where.timestamp = { [Op.gte]: new Date(startDate) };
-        if (endDate) where.timestamp = { [Op.lte]: new Date(endDate) };
+
+        if (startDate) {
+            const start = new Date(startDate); start.setHours(0, 0, 0, 0);
+            where.timestamp = { [Op.gte]: start };
+        }
+        if (endDate) {
+            const end = new Date(endDate); end.setHours(23, 59, 59, 999);
+            where.timestamp = { ...(where.timestamp || {}), [Op.lte]: end };
+        }
 
         switch (role) {
-            case 'superadmin':
+             case 'superadmin':
                 if (queryCompanyId && queryCompanyId !== 'all') {
                     const users = await db.User.findAll({ where: { companyId: queryCompanyId }, attributes: ['id'] });
                     where.userId = { [Op.in]: users.map(u => u.id) };
                 }
-                if (queryUserId && queryUserId !== 'all') {
-                    where.userId = queryUserId;
-                }
+                if (queryUserId && queryUserId !== 'all') where.userId = queryUserId;
                 break;
             case 'admin':
                 const usersInCompany = await db.User.findAll({ where: { companyId: currentUserCompanyId }, attributes: ['id'] });
                 const userIdsInCompany = usersInCompany.map(u => u.id);
+                where.userId = { [Op.in]: userIdsInCompany };
                 if (queryUserId && queryUserId !== 'all' && userIdsInCompany.includes(queryUserId)) {
                     where.userId = queryUserId;
-                } else {
-                    where.userId = { [Op.in]: userIdsInCompany };
                 }
                 break;
-            default: // 'user' role
-                where.userId = currentUserId;
-                break;
+            default: where.userId = currentUserId; break;
         }
         const events = await db.RefuelEvent.findAll({ where, include: [{ model: db.User, attributes: ['username', 'realName'] }], order: [['timestamp', 'DESC']] });
         res.json(events);
@@ -402,96 +332,71 @@ eventsRouter.get('/refuel-events', async (req, res) => {
     }
 });
 
-eventsRouter.get('/refuel-events/:id', authenticateToken, async (req, res) => {
-    try {
-        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.RefuelEvent.findByPk(req.params.id);
-        if (!event) return res.status(404).json({ error: 'Event not found.' });
-
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        if (role === 'admin') {
-            const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        }
-        res.json(event);
-    } catch (error) {
-        console.error('Error fetching single refuel event:', error);
-        res.status(500).json({ error: 'Failed to fetch event.' });
-    }
-});
-
-eventsRouter.put('/refuel-events/:id', authenticateToken, async (req, res) => {
-    try {
-        const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.RefuelEvent.findByPk(req.params.id);
-        if (!event) return res.status(404).json({ error: 'Event not found.' });
-
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
-        if (role === 'admin') {
-            const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
-        }
-        await event.update(req.body);
-        res.json(event);
-    } catch (error) {
-        console.error('Error updating refuel event:', error);
-        res.status(500).json({ error: 'Failed to update event.' });
-    }
-});
-
 eventsRouter.post('/refuel-events', async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
         const eventData = req.body;
 
+        let targetCompanyId = currentUserCompanyId;
         if (role === 'user') {
             eventData.userId = currentUserId;
-        } else if (role === 'admin') {
+        } else if (role === 'admin' || role === 'superadmin') {
+            if (!eventData.userId) return res.status(400).json({ error: 'User selection is required.' });
             const targetUser = await db.User.findByPk(eventData.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
+            if (!targetUser) return res.status(404).json({ error: 'Target user not found.' });
+            if (role === 'admin' && targetUser.companyId !== currentUserCompanyId) {
                 return res.status(403).json({ error: 'Forbidden: You can only create events for users in your company.' });
             }
+            targetCompanyId = targetUser.companyId;
         }
+        eventData.companyId = targetCompanyId;
         
+        if (!eventData.timestamp || !eventData.fuelAmount || !eventData.odometer) {
+            return res.status(400).json({ error: 'Date, fuel amount, and odometer are required for refuel events.' });
+        }
+
         const newEvent = await db.RefuelEvent.create(eventData);
         res.status(201).json(newEvent);
     } catch (error) {
+         if (error.name === 'SequelizeValidationError') return res.status(400).json({ error: error.errors.map(e => e.message).join(', ') });
         console.error('Error creating refuel event:', error);
         res.status(500).json({ error: 'Failed to create refuel event.' });
     }
 });
 
-eventsRouter.delete('/refuel-events/:id', async (req, res) => {
+// Common PUT and DELETE logic for brevity in this example
+const genericEditOrDelete = (modelName) => async (req, res) => {
     try {
         const { role, userId: currentUserId, companyId: currentUserCompanyId } = req.user;
-        const event = await db.RefuelEvent.findByPk(req.params.id);
+        const event = await db[modelName].findByPk(req.params.id);
         if (!event) return res.status(404).json({ error: 'Event not found.' });
 
-        if (role === 'user' && event.userId !== currentUserId) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
+        if (role === 'user' && event.userId !== currentUserId) return res.status(403).json({ error: 'Forbidden' });
         if (role === 'admin') {
             const targetUser = await db.User.findByPk(event.userId);
-            if (!targetUser || targetUser.companyId !== currentUserCompanyId) {
-                return res.status(403).json({ error: 'Forbidden' });
-            }
+            if (!targetUser || targetUser.companyId !== currentUserCompanyId) return res.status(403).json({ error: 'Forbidden' });
         }
 
-        await event.destroy();
-        res.status(204).send();
+        if (req.method === 'PUT') {
+            await event.update(req.body);
+            res.json(event);
+        } else { // DELETE
+            await event.destroy();
+            res.status(204).send();
+        }
     } catch (error) {
-        console.error('Error deleting refuel event:', error);
-        res.status(500).json({ error: 'Failed to delete refuel event.' });
+        console.error(`Error ${req.method === 'PUT' ? 'updating' : 'deleting'} ${modelName}:`, error);
+        res.status(500).json({ error: `Failed to ${req.method === 'PUT' ? 'update' : 'delete'} event.` });
     }
-});
+};
+
+eventsRouter.get('/workday-events/:id', genericEditOrDelete('WorkdayEvent'));
+eventsRouter.put('/workday-events/:id', genericEditOrDelete('WorkdayEvent'));
+eventsRouter.delete('/workday-events/:id', genericEditOrDelete('WorkdayEvent'));
+
+eventsRouter.get('/refuel-events/:id', genericEditOrDelete('RefuelEvent'));
+eventsRouter.put('/refuel-events/:id', genericEditOrDelete('RefuelEvent'));
+eventsRouter.delete('/refuel-events/:id', genericEditOrDelete('RefuelEvent'));
 
 app.use('/api', eventsRouter);
 
