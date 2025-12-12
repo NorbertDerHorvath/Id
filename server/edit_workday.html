@@ -37,22 +37,25 @@
             const eventId = urlParams.get('id');
             if (!eventId) { alert('No event ID specified.'); window.location.href = '/dashboard'; return; }
 
+            const getVal = id => document.getElementById(id).value;
+            const getNumVal = id => getVal(id) ? parseFloat(getVal(id)) : null;
+            const setVal = (id, value) => { if (document.getElementById(id)) document.getElementById(id).value = value; };
+            const formatForInput = (date) => date ? new Date(date).toISOString().slice(0, 16) : '';
+
             try {
                 const res = await fetch(`/api/workday-events/${eventId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Failed to load event data.');
                 
                 const event = await res.json();
-                // Format dates for datetime-local input
-                const formatForInput = (date) => new Date(date).toISOString().slice(0, 16);
 
-                document.getElementById('start-time').value = formatForInput(event.startTime);
-                if (event.endTime) document.getElementById('end-time').value = formatForInput(event.endTime);
-                document.getElementById('start-location').value = event.startLocation || '';
-                document.getElementById('end-location').value = event.endLocation || '';
-                document.getElementById('car-plate').value = event.carPlate || '';
-                document.getElementById('start-odo').value = event.startOdometer || '';
-                document.getElementById('end-odo').value = event.endOdometer || '';
-                document.getElementById('break-time').value = event.breakTime || 0;
+                setVal('start-time', formatForInput(event.startTime));
+                setVal('end-time', formatForInput(event.endTime));
+                setVal('start-location', event.startLocation || '');
+                setVal('end-location', event.endLocation || '');
+                setVal('car-plate', event.carPlate || '');
+                setVal('start-odo', event.startOdometer || '');
+                setVal('end-odo', event.endOdometer || '');
+                setVal('break-time', event.breakTime || '');
 
             } catch (error) {
                 alert(error.message);
@@ -62,14 +65,14 @@
             document.getElementById('edit-workday-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const updatedEvent = {
-                    startTime: document.getElementById('start-time').value,
-                    endTime: document.getElementById('end-time').value || null,
-                    startLocation: document.getElementById('start-location').value,
-                    endLocation: document.getElementById('end-location').value,
-                    carPlate: document.getElementById('car-plate').value,
-                    startOdometer: document.getElementById('start-odo').value,
-                    endOdometer: document.getElementById('end-odo').value,
-                    breakTime: document.getElementById('break-time').value
+                    startTime: getVal('start-time') || null,
+                    endTime: getVal('end-time') || null,
+                    startLocation: getVal('start-location') || null,
+                    endLocation: getVal('end-location') || null,
+                    carPlate: getVal('car-plate') || null,
+                    startOdometer: getNumVal('start-odo'),
+                    endOdometer: getNumVal('end-odo'),
+                    breakTime: getNumVal('break-time')
                 };
 
                 try {

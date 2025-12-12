@@ -10,9 +10,9 @@
         <h2>Edit Refuel Event</h2>
         <form id="edit-refuel-form">
             <div class="form-row">
-               <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="refuel-date" required></div>
-               <div class="form-group col-md-4"><label>Odometer</label><input type="number" class="form-control" id="refuel-odo" required></div>
-               <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="refuel-amount" required></div>
+               <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="refuel-date"></div>
+               <div class="form-group col-md-4"><label>Odometer</label><input type="number" class="form-control" id="refuel-odo"></div>
+               <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="refuel-amount"></div>
             </div>
              <div class="form-row">
                <div class="form-group col-md-4"><label>Fuel Type</label><input type="text" class="form-control" id="refuel-type"></div>
@@ -37,21 +37,25 @@
             const eventId = urlParams.get('id');
             if (!eventId) { alert('No event ID specified.'); window.location.href = '/dashboard'; return; }
 
+            const getVal = id => document.getElementById(id).value;
+            const getNumVal = id => getVal(id) ? parseFloat(getVal(id)) : null;
+            const setVal = (id, value) => { if (document.getElementById(id)) document.getElementById(id).value = value; };
+            const formatForInput = (date) => date ? new Date(date).toISOString().slice(0, 16) : '';
+
             try {
                 const res = await fetch(`/api/refuel-events/${eventId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error('Failed to load event data.');
                 
                 const event = await res.json();
-                const formatForInput = (date) => new Date(date).toISOString().slice(0, 16);
 
-                document.getElementById('refuel-date').value = formatForInput(event.timestamp);
-                document.getElementById('refuel-odo').value = event.odometer;
-                document.getElementById('refuel-amount').value = event.fuelAmount;
-                document.getElementById('refuel-type').value = event.fuelType || '';
-                document.getElementById('refuel-price').value = event.value || '';
-                document.getElementById('refuel-payment').value = event.paymentMethod || '';
-                document.getElementById('refuel-location').value = event.location || '';
-                 document.getElementById('car-plate').value = event.carPlate || '';
+                setVal('refuel-date', formatForInput(event.timestamp));
+                setVal('refuel-odo', event.odometer || '');
+                setVal('refuel-amount', event.fuelAmount || '');
+                setVal('refuel-type', event.fuelType || '');
+                setVal('refuel-price', event.value || '');
+                setVal('refuel-payment', event.paymentMethod || '');
+                setVal('refuel-location', event.location || '');
+                setVal('car-plate', event.carPlate || '');
 
             } catch (error) {
                 alert(error.message);
@@ -61,14 +65,14 @@
             document.getElementById('edit-refuel-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const updatedEvent = {
-                    timestamp: document.getElementById('refuel-date').value,
-                    odometer: document.getElementById('refuel-odo').value,
-                    fuelAmount: document.getElementById('refuel-amount').value,
-                    fuelType: document.getElementById('refuel-type').value,
-                    value: document.getElementById('refuel-price').value,
-                    paymentMethod: document.getElementById('refuel-payment').value,
-                    location: document.getElementById('refuel-location').value,
-                    carPlate: document.getElementById('car-plate').value
+                    timestamp: getVal('refuel-date') || null,
+                    odometer: getNumVal('refuel-odo'),
+                    fuelAmount: getNumVal('refuel-amount'),
+                    fuelType: getVal('refuel-type') || null,
+                    value: getNumVal('refuel-price'),
+                    paymentMethod: getVal('refuel-payment') || null,
+                    location: getVal('refuel-location') || null,
+                    carPlate: getVal('car-plate') || null
                 };
 
                 try {

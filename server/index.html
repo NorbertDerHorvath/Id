@@ -138,9 +138,9 @@
                     <h6>Refuel Entry</h6>
                     <form id="manual-refuel-form">
                         <div class="form-row">
-                           <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="manual-refuel-date" required></div>
-                           <div class="form-group col-md-4" data-field="refuel_odometer"><label>Odometer</label><input type="number" class="form-control" id="manual-refuel-odo" required></div>
-                           <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-amount" required></div>
+                           <div class="form-group col-md-4"><label>Date</label><input type="datetime-local" class="form-control" id="manual-refuel-date"></div>
+                           <div class="form-group col-md-4" data-field="refuel_odometer"><label>Odometer</label><input type="number" class="form-control" id="manual-refuel-odo"></div>
+                           <div class="form-group col-md-4"><label>Amount (L)</label><input type="number" step="0.01" class="form-control" id="manual-refuel-amount"></div>
                         </div>
                          <div class="form-row">
                            <div class="form-group col-md-4" data-field="refuel_fuelType"><label>Fuel Type</label><input type="text" class="form-control" id="manual-refuel-type"></div>
@@ -417,16 +417,19 @@
             if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
                 userId = document.getElementById('manual-user-select').value;
             }
+            const getVal = id => document.getElementById(id).value;
+            const getNumVal = id => getVal(id) ? parseFloat(getVal(id)) : null;
+
             const body = {
                 userId,
-                startTime: document.getElementById('manual-start-time').value,
-                endTime: document.getElementById('manual-end-time').value || null,
-                startLocation: document.getElementById('manual-start-location').value,
-                endLocation: document.getElementById('manual-end-location').value,
-                carPlate: document.getElementById('manual-car-plate').value,
-                startOdometer: document.getElementById('manual-start-odo').value,
-                endOdometer: document.getElementById('manual-end-odo').value,
-                breakTime: document.getElementById('manual-break').value,
+                startTime: getVal('manual-start-time') || null,
+                endTime: getVal('manual-end-time') || null,
+                startLocation: getVal('manual-start-location'),
+                endLocation: getVal('manual-end-location'),
+                carPlate: getVal('manual-car-plate'),
+                startOdometer: getNumVal('manual-start-odo'),
+                endOdometer: getNumVal('manual-end-odo'),
+                breakTime: getNumVal('manual-break'),
             };
 
             try {
@@ -437,6 +440,7 @@
                 });
                 if(!res.ok) throw new Error((await res.json()).error);
                 $('#manualEntryModal').modal('hide');
+                document.getElementById('manual-work-form').reset();
                 fetchData();
             } catch(e) { alert('Error: ' + e.message); }
         }
@@ -447,15 +451,18 @@
             if (currentUser.role === 'admin' || currentUser.role === 'superadmin') {
                 userId = document.getElementById('manual-user-select').value;
             }
+             const getVal = id => document.getElementById(id).value;
+             const getNumVal = id => getVal(id) ? parseFloat(getVal(id)) : null;
+
              const body = {
                 userId,
-                timestamp: document.getElementById('manual-refuel-date').value,
-                odometer: document.getElementById('manual-refuel-odo').value,
-                fuelType: document.getElementById('manual-refuel-type').value,
-                fuelAmount: document.getElementById('manual-refuel-amount').value,
-                price: document.getElementById('manual-refuel-price').value,
-                paymentMethod: document.getElementById('manual-refuel-payment').value,
-                location: document.getElementById('manual-refuel-location').value
+                timestamp: getVal('manual-refuel-date') || null,
+                odometer: getNumVal('manual-refuel-odo'),
+                fuelType: getVal('manual-refuel-type'),
+                fuelAmount: getNumVal('manual-refuel-amount'),
+                value: getNumVal('manual-refuel-price'), // Corrected key
+                paymentMethod: getVal('manual-refuel-payment'),
+                location: getVal('manual-refuel-location')
             };
             try {
                 const res = await fetch('/api/refuel-events', {
@@ -465,6 +472,7 @@
                 });
                 if(!res.ok) throw new Error((await res.json()).error);
                 $('#manualEntryModal').modal('hide');
+                document.getElementById('manual-refuel-form').reset();
                 fetchData();
             } catch(e) { alert('Error: ' + e.message); }
         }
