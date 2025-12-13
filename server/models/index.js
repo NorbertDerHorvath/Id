@@ -6,8 +6,8 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-// The config is explicitly required here, assuming it's in the parent directory.
-const config = require(__dirname + '/../config/config.js')[env]; 
+// Corrected path to be relative to the project root, assuming a standard sequelize-cli layout.
+const config = require(path.join(__dirname, '..', '..', 'config', 'config.js'))[env]; 
 const db = {};
 
 let sequelize;
