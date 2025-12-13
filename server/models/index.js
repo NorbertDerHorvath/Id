@@ -6,11 +6,10 @@ const Sequelize = require('sequelize');
 const basename = path.basename(__filename);
 const db = {};
 
-// Directly import the already configured sequelize instance from the custom database.js
+// A már konfigurált sequelize példány importálása
 const sequelize = require(path.join(__dirname, '..', 'config', 'database.js'));
 
-fs
-  .readdirSync(__dirname)
+fs.readdirSync(__dirname)
   .filter(file => {
     return (
       file.indexOf('.') !== 0 &&
@@ -30,7 +29,7 @@ Object.keys(db).forEach(modelName => {
   }
 });
 
-// Explicitly define associations
+// Explicit kapcsolatok
 db.User.belongsTo(db.Company, { foreignKey: 'companyId', as: 'Company' });
 db.Company.hasMany(db.User, { foreignKey: 'companyId' });
 
