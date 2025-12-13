@@ -1,3 +1,4 @@
+require('dotenv').config();
 console.log('--- SERVER STARTING: DEPLOYMENT-CHECK-V2 ---');
 const express = require('express');
 const cors = require('cors');
