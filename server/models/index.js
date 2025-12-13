@@ -6,8 +6,8 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-// Corrected path to be relative to the models directory.
-const config = require(path.join(__dirname, '..', 'config', 'config.js'))[env]; 
+// Corrected path and filename for the config.
+const config = require(path.join(__dirname, '..', 'config', 'database.js'))[env]; 
 const db = {};
 
 let sequelize;
