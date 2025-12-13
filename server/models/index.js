@@ -1,45 +1,64 @@
-const { Sequelize, DataTypes } = require('sequelize');
+'use strict';
 
-const connectionString = process.env.DB_CONNECTION_STRING || 'postgres://user:password@localhost:5432/database';
-const isProduction = process.env.NODE_ENV === 'production';
-
-const sequelize = new Sequelize(connectionString, {
-  dialect: 'postgres',
-  logging: false,
-  dialectOptions: {
-    ssl: isProduction ? { require: true, rejectUnauthorized: false } : false,
-  },
-});
-
+const fs = require('fs');
+const path = require('path');
+const Sequelize = require('sequelize');
+const process = require('process');
+const basename = path.basename(__filename);
+const env = process.env.NODE_ENV || 'development';
+// The config is explicitly required here, assuming it's in the parent directory.
+const config = require(__dirname + '/../config/config.js')[env]; 
 const db = {};
 
-db.Sequelize = Sequelize;
-db.sequelize = sequelize;
+let sequelize;
+if (config.use_env_variable) {
+  sequelize = new Sequelize(process.env[config.use_env_variable], config);
+} else {
+  sequelize = new Sequelize(config.database, config.username, config.password, config);
+}
 
-db.Company = require('./Company')(sequelize, DataTypes);
-db.User = require('./User')(sequelize, DataTypes);
-db.WorkdayEvent = require('./WorkdayEvent')(sequelize, DataTypes);
-db.RefuelEvent = require('./RefuelEvent')(sequelize, DataTypes);
-db.LoadingEvent = require('./LoadingEvent')(sequelize, DataTypes);
-db.Settings = require('./Settings')(sequelize, DataTypes);
+fs
+  .readdirSync(__dirname)
+  .filter(file => {
+    return (
+      file.indexOf('.') !== 0 &&
+      file !== basename &&
+      file.slice(-3) === '.js' &&
+      file.indexOf('.test.js') === -1
+    );
+  })
+  .forEach(file => {
+    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    db[model.name] = model;
+  });
 
-// Associations
+// --- Associations Setup ---
+Object.keys(db).forEach(modelName => {
+  if (db[modelName].associate) {
+    db[modelName].associate(db);
+  }
+});
+
+// Explicitly define associations
+db.User.belongsTo(db.Company, { foreignKey: 'companyId', as: 'Company' });
 db.Company.hasMany(db.User, { foreignKey: 'companyId' });
-db.User.belongsTo(db.Company, { foreignKey: 'companyId' });
 
+db.WorkdayEvent.belongsTo(db.User, { foreignKey: 'userId', as: 'User' });
 db.User.hasMany(db.WorkdayEvent, { foreignKey: 'userId' });
-db.WorkdayEvent.belongsTo(db.User, { foreignKey: 'userId' });
 
+db.WorkdayEvent.belongsTo(db.Company, { foreignKey: 'companyId' });
+db.Company.hasMany(db.WorkdayEvent, { foreignKey: 'companyId' });
+
+db.RefuelEvent.belongsTo(db.User, { foreignKey: 'userId', as: 'User' });
 db.User.hasMany(db.RefuelEvent, { foreignKey: 'userId' });
-db.RefuelEvent.belongsTo(db.User, { foreignKey: 'userId' });
 
-db.User.hasMany(db.LoadingEvent, { foreignKey: 'userId' });
-db.LoadingEvent.belongsTo(db.User, { foreignKey: 'userId' });
+db.RefuelEvent.belongsTo(db.Company, { foreignKey: 'companyId' });
+db.Company.hasMany(db.RefuelEvent, { foreignKey: 'companyId' });
 
-db.Company.hasOne(db.Settings, { foreignKey: 'companyId' });
 db.Settings.belongsTo(db.Company, { foreignKey: 'companyId' });
+db.Company.hasOne(db.Settings, { foreignKey: 'companyId' });
 
-db.User.hasOne(db.Settings, { foreignKey: 'userId' });
-db.Settings.belongsTo(db.User, { foreignKey: 'userId' });
+db.sequelize = sequelize;
+db.Sequelize = Sequelize;
 
 module.exports = db;
