@@ -6,8 +6,7 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-// Corrected path and filename for the config.
-const config = require(path.join(__dirname, '..', 'config', 'database.js'))[env]; 
+const config = require(path.join(__dirname, '..', 'config', 'database.js'))[env];
 const db = {};
 
 let sequelize;
@@ -32,14 +31,12 @@ fs
     db[model.name] = model;
   });
 
-// --- Associations Setup ---
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
   }
 });
 
-// Explicitly define associations
 db.User.belongsTo(db.Company, { foreignKey: 'companyId', as: 'Company' });
 db.Company.hasMany(db.User, { foreignKey: 'companyId' });
 
