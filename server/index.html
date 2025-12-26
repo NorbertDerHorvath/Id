@@ -199,6 +199,7 @@
             }
              if (currentUser.role === 'superadmin') {
                 await populateCompanyFilter();
+                document.getElementById('company-filter').addEventListener('change', () => populateUserFilter(document.getElementById('company-filter').value));
             }
 
             document.getElementById('filter-btn').addEventListener('click', fetchData);
@@ -286,9 +287,13 @@
             } catch(e) { console.error(e); }
         }
 
-        async function populateUserFilter() {
+        async function populateUserFilter(companyId = 'all') {
              try {
-                const res = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+                let url = '/api/admin/users';
+                if (companyId !== 'all') {
+                    url += `?companyId=${companyId}`;
+                }
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
                 allUsers = await res.json();
                 const userFilter = document.getElementById('user-filter');
                 const manualUserSelect = document.getElementById('manual-user-select');
