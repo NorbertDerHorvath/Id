@@ -142,6 +142,10 @@
                         <tbody id="company-management-table-body"></tbody>
                     </table>
                 </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#newCompanyModal">Add New Company</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
@@ -220,7 +224,7 @@
                 const adminEmail = document.getElementById('newCompanyAdminEmail').value;
                 
                 try {
-                    const response = await fetch('/api/companies', {
+                    const response = await fetch('/api/admin/companies', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ name: companyName, adminEmail: adminEmail })
@@ -236,7 +240,11 @@
 
                     $('#newCompanyModal').modal('hide');
                     document.getElementById('new-company-form').reset();
-                    await loadCompanies(); 
+                    
+                    // Refresh the company list in the filter and in the manage modal if open
+                    await loadCompanies();
+                    populateCompanyManagementModal();
+
                 } catch (error) {
                     alert('Error creating company: ' + error.message);
                 }
@@ -249,13 +257,20 @@
                 const adminEmail = document.getElementById('editCompanyAdminEmail').value;
 
                 try {
-                    const response = await fetch(`/api/companies/${companyId}`, {
+                    const response = await fetch(`/api/admin/companies/${companyId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ name: companyName, adminEmail: adminEmail })
                     });
                     if (!response.ok) throw new Error('Failed to update company');
-                    await loadCompanies();
+                    
+                    // Update the local list
+                    const index = companies.findIndex(c => c.id === companyId);
+                    if (index !== -1) {
+                        companies[index] = { ...companies[index], name: companyName, adminEmail: adminEmail };
+                    }
+                    
+                    await loadCompanies(); // Refresh dropdowns
                     $('#editCompanyModal').modal('hide');
                     populateCompanyManagementModal();
                 } catch (error) {
@@ -266,10 +281,14 @@
 
         async function loadCompanies() {
             try {
-                const response = await fetch('/api/companies', { headers: { 'Authorization': `Bearer ${token}` } });
+                const response = await fetch('/api/admin/companies', { headers: { 'Authorization': `Bearer ${token}` } });
                 companies = await response.json();
                 const companySelect = document.getElementById('company-select');
                 const companyFilter = document.getElementById('company-filter');
+                
+                // Save current selections to restore them
+                const currentFilterValue = companyFilter.value;
+                const currentSelectValue = companySelect.value;
 
                 companySelect.innerHTML = '<option value="">No Company</option><option value="new">New Company...</option>';
                 companyFilter.innerHTML = '<option value="all">All Companies</option>';
@@ -278,6 +297,11 @@
                     companySelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
                     companyFilter.innerHTML += `<option value="${c.id}">${c.name}</option>`;
                 });
+                
+                // Restore selections if possible, otherwise default
+                if(currentFilterValue) companyFilter.value = currentFilterValue;
+                if(currentSelectValue && currentSelectValue !== 'new') companySelect.value = currentSelectValue;
+
             } catch (error) {
                 console.error('Error loading companies:', error);
             }
@@ -304,14 +328,32 @@
             document.getElementById('editCompanyId').value = company.id;
             document.getElementById('editCompanyName').value = company.name;
             document.getElementById('editCompanyAdminEmail').value = company.adminEmail;
+            $('#companyManagementModal').modal('hide'); // Hide the management modal
             $('#editCompanyModal').modal('show');
+            
+            // Re-open management modal when edit modal is closed without saving
+             $('#editCompanyModal').on('hidden.bs.modal', function (e) {
+                // Remove this handler to prevent multiple bindings if opened again
+                 $(this).off('hidden.bs.modal');
+                 // Only show if we didn't just submit (which would handle its own flow)
+                 // But simpler: just let the user reopen it. Or we can chain them.
+                 // Let's rely on the user reopening "Manage Companies" or successful save re-opening it.
+                 // Actually, a better UX is to have the management modal stay open in background or re-open.
+                 // Bootstrap 4 doesn't support nested modals well by default.
+                 // The standard way is swap them.
+                 
+                 // So we leave it closed, user has to click "Manage Companies" again? 
+                 // Or we can programmatically open it.
+                 // Let's try to re-open it.
+                 $('#companyManagementModal').modal('show');
+            });
         }
 
         async function deleteCompany(companyId) {
             if (!confirm('Are you sure you want to delete this company? This will also delete all associated users.')) return;
 
             try {
-                const response = await fetch(`/api/companies/${companyId}`, {
+                const response = await fetch(`/api/admin/companies/${companyId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -332,8 +374,14 @@
         async function loadUsers(companyIdFilter = 'all') {
             const tableBody = document.getElementById('user-table-body');
             try {
+                // Always reload users from server to ensure fresh data, especially when switching filters
+                // Or if we want to cache, we must ensure cache is invalidated correctly.
+                // For simplicity and correctness with "All Companies" vs specific company filter:
+                // Let's fetch filtered list from server if filtering is active, or filter client side.
+                // Given the previous implementation fetched all users:
+                
                 if (allUsers.length === 0) {
-                    const response = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
+                     const response = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
                     if (!response.ok) {
                         const err = await response.json();
                         throw new Error(err.error || `HTTP error! Status: ${response.status}`);
@@ -342,6 +390,7 @@
                 }
 
                 let usersToDisplay = allUsers;
+                // Client-side filtering
                 if (currentUserRole === 'superadmin' && companyIdFilter !== 'all') {
                     usersToDisplay = allUsers.filter(u => u.companyId === companyIdFilter);
                 }
@@ -451,6 +500,16 @@
                     throw new Error(err.error || 'Save failed');
                 }
                 const updatedUser = await response.json();
+                
+                // If it's a new user or updated, we need to refresh the list correctly
+                // If we rely on allUsers cache, we must update it
+                // But the server response might not contain the associated Company object fully populated initially
+                // So the table might show 'N/A' for company unless we fetch again or manually patch it.
+                
+                // Let's patch it simply if we can find the company name in our companies list
+                const company = companies.find(c => c.id === body.companyId);
+                updatedUser.Company = company; // Patch for display
+                
                 if (userId) {
                     allUsers = allUsers.map(u => u.id === userId ? updatedUser : u);
                 } else {
