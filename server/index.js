@@ -124,10 +124,15 @@ adminAndSettingsRouter.post('/api/settings', async (req, res) => {
 
 adminAndSettingsRouter.get('/api/admin/users', async (req, res) => {
     const { companyId, role } = req.user;
+    const { companyId: queryCompanyId } = req.query;
     try {
         const queryOptions = { attributes: { exclude: ['password'] }, include: [{ model: db.Company, as: 'Company' }], order: [['username', 'ASC']] };
         if (role === 'admin') {
             queryOptions.where = { companyId: companyId, role: {[Op.ne]: 'superadmin'} };
+        } else if (role === 'superadmin') {
+             if (queryCompanyId && queryCompanyId !== 'all') {
+                queryOptions.where = { companyId: queryCompanyId };
+            }
         }
         res.json(await db.User.findAll(queryOptions));
     } catch (error) {
